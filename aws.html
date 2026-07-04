@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 08 / Cloud</div>
+  <h1>AWS for Architects</h1>
+  <p>Scaling, Serverless, Load Balancers, and Messaging — the AWS building blocks a Tech Lead is expected to reason about at a design-decision level, not implementation detail level.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#scaling">01 Scaling</a>
+  <a href="#serverless">02 Serverless / Lambda</a>
+  <a href="#lb">03 ALB vs NLB</a>
+  <a href="#messaging">04 SQS vs SNS</a>
+  <a href="#drill">05 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="scaling" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Scaling — Vertical, Horizontal, Auto Scaling Groups</h2>
+  <div class="tagline">Bigger machine vs more machines, and letting AWS decide when</div>
+
+  <p><b>Define:</b> <b>Vertical scaling</b> = bigger instance (more CPU/RAM on the same box). <b>Horizontal scaling</b> = more instances behind a load balancer. An <b>Auto Scaling Group (ASG)</b> automatically adds/removes instances based on metrics (CPU, request count, custom CloudWatch metrics).</p>
+
+  <div class="analogy"><b>Analogy:</b> Vertical scaling is hiring a stronger single worker. Horizontal scaling is hiring more workers and splitting the work. An Auto Scaling Group is a manager who watches the line at checkout and calls in more cashiers only when the queue actually gets long, sending them home when it clears.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Vertical scaling has a hard ceiling (biggest instance type available) and a single point of failure. Horizontal scaling has no practical ceiling and survives individual instance failure — but requires the app to be stateless (or externalize state to a shared store), since you can't guarantee the same instance serves a user twice.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Vertical when</span>Simple, quick fix for a stateful legacy app not built for horizontal scaling; lower operational complexity.</div>
+    <div class="avoid-box"><span class="lbl">Horizontal when</span>You need real fault tolerance and elastic capacity — but only works cleanly if the app is stateless (session state externalized to Redis/DynamoDB, not in-process memory).</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The real prerequisite for horizontal scaling is statelessness — if a service keeps session state in memory, adding instances just creates a 'sticky session' problem. I'd always check that before recommending horizontal scaling as the fix for a capacity problem."</p>
+  </div>
+</section>
+
+<section class="panel" id="serverless" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Serverless — Lambda</h2>
+  <div class="tagline">No servers to manage — pay only for the compute time you actually use</div>
+
+  <p><b>Define:</b> AWS Lambda runs your code in response to events (an HTTP request, a queue message, a file upload) without you provisioning or managing any server — AWS handles scaling, patching, and infrastructure entirely.</p>
+
+  <div class="analogy"><b>Analogy:</b> Owning a car (a traditional server) means paying for it whether you drive it or not, and maintaining it yourself. Lambda is like a taxi — you pay only for the exact ride you take, and someone else maintains the vehicle. Great for occasional trips, expensive and awkward if you're commuting daily at scale.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Many workloads are bursty or infrequent (a nightly batch job, a webhook handler, an image-resize trigger) — running a dedicated server 24/7 for something that fires 50 times a day wastes money and operational effort. Lambda charges per invocation and per millisecond of execution.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Event-driven, bursty, or infrequent workloads; short-lived tasks (under 15 min); you want zero infrastructure management.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Consistently high, predictable traffic (EC2/containers often cheaper at sustained scale); long-running processes; workloads sensitive to <b>cold starts</b> — the latency spike when a Lambda spins up from idle.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Lambda's cost model is the deciding factor for me — it's excellent for bursty or infrequent event-driven work, but at sustained high throughput, a always-on container or EC2 fleet is often cheaper than paying per-invocation. Cold start latency is the other real constraint I'd check against the specific use case's latency requirements."</p>
+  </div>
+</section>
+
+<section class="panel" id="lb" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>ALB vs NLB</h2>
+  <div class="tagline">Layer 7 (application-aware) vs Layer 4 (raw speed) load balancing</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">ALB (Application Load Balancer)</span>Operates at Layer 7 (HTTP/HTTPS) — can route based on URL path, host header, or headers. Supports WebSocket, SSL termination, and content-based routing (e.g. /api/* → one service, /admin/* → another).</div>
+    <div class="avoid-box"><span class="lbl">NLB (Network Load Balancer)</span>Operates at Layer 4 (TCP/UDP) — no awareness of HTTP content, just routes connections. Handles massive throughput with ultra-low latency, and supports static IP addresses.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> An ALB is a receptionist reading the actual content of your request ("I need Billing" → routes you to Billing). An NLB is a phone switchboard operator who just connects call to extension by number, without listening to what you say — much faster, but blind to content.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use ALB when</span>Microservices with path-based routing, need for HTTP-level features (cookies, headers, WebSocket).</div>
+    <div class="avoid-box"><span class="lbl">Use NLB when</span>Extreme throughput/low-latency requirements, non-HTTP protocols, or needing a static IP for allowlisting.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The decision is really about whether I need to make routing decisions based on HTTP content — if yes, ALB; if I just need raw, extremely fast TCP-level load balancing without content awareness, NLB. Most typical microservices setups reach for ALB because path-based routing between services is exactly the Layer 7 feature they need."</p>
+  </div>
+</section>
+
+<section class="panel" id="messaging" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>SQS vs SNS</h2>
+  <div class="tagline">Queue (one consumer takes it) vs Topic (every subscriber gets a copy)</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">SQS (Simple Queue Service)</span>A queue — a message is delivered to and processed by exactly one consumer (or one per consumer group), then removed. Good for work distribution and buffering/decoupling load.</div>
+    <div class="avoid-box"><span class="lbl">SNS (Simple Notification Service)</span>A pub/sub topic — every subscriber gets its own copy of the message. Good for fan-out: one event needs multiple independent reactions.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> SQS is a ticket queue at a deli counter — one ticket, one customer served, ticket gone. SNS is a fire alarm — everyone in the building hears it and reacts independently; the alarm doesn't "run out" after the first person responds.</div>
+
+  <div class="block-title">The common combined pattern: SNS fan-out to SQS</div>
+  <p>Publish once to an SNS topic, with multiple SQS queues subscribed to it — each downstream service gets its own durable queue to process at its own pace, combining SNS's fan-out with SQS's durability and per-consumer buffering. This is the standard AWS pattern for "one event, several independent reactions, each reliably processed."</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions screening system, a "match found" event fanned out via SNS to separate SQS queues for notification, audit logging, and case management would let each downstream concern scale and fail independently — a notification service outage wouldn't block audit logging from happening.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"SQS is for work distribution — one consumer per message. SNS is for fan-out — every subscriber gets a copy. When I need both durability and fan-out, I reach for the standard SNS-to-multiple-SQS pattern rather than picking one or the other."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Prerequisite for horizontal scaling to work cleanly?</div><div class="a">Statelessness — session state must be externalized, not held in-process.</div></div>
+    <div class="qa-item"><div class="q">When is Lambda the wrong choice?</div><div class="a">Sustained high, predictable throughput — per-invocation billing gets expensive versus an always-on fleet; also long-running or latency-sensitive workloads due to cold starts.</div></div>
+    <div class="qa-item"><div class="q">ALB or NLB for path-based routing between microservices?</div><div class="a">ALB — Layer 7, HTTP-aware routing.</div></div>
+    <div class="qa-item"><div class="q">One event needs 3 independent downstream reactions — SQS or SNS?</div><div class="a">SNS (fan-out) — ideally SNS fanning out to separate SQS queues so each reaction is also durable and independently scalable.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 08 — AWS · Interview Prep Series</footer>
+</body>
+</html>
