@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic AI / Copilot / MCP — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 05 / Your Differentiator</div>
+  <h1>Agentic AI, Copilot & MCP</h1>
+  <p>This is the section that actually differentiates you. Most candidates can recite AI buzzwords — few have a real, specific story of acting as architect while AI implements. Lead with the story, then show you understand the mechanics underneath it.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#story">01 Your Core Story</a>
+  <a href="#agentic">02 What "Agentic" Means</a>
+  <a href="#prompting">03 Prompt Engineering Patterns</a>
+  <a href="#mcp">04 MCP Architecture</a>
+  <a href="#reviewer">05 The Architect-Reviewer Role</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="story" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Your Core Story — The Sanctions Screening API</h2>
+  <div class="tagline">Say this early, unprompted, if the interview gives you an opening</div>
+
+  <p><b>The one-paragraph version:</b> "I built a production-grade sanctions screening REST API from scratch using GitHub Copilot and Claude, with FastAPI and Python, acting as the architect and reviewer while AI handled implementation. It grew to four endpoints — /screen, /forecast, /explain, and a health check — with weighted multi-algorithm matching combining fuzzy, phonetic, and Levenshtein distance scoring, multi-list support across OFAC SDN, OFAC Non-SDN, and UN sources, and a config-driven, layered architecture. I independently debugged issues and proactively identified architectural improvements along the way."</p>
+
+  <div class="block-title">Why this story is strong</div>
+  <p>It's not "I used ChatGPT to write some code." It has: a real domain with genuine complexity (compliance/sanctions matching), a specific architectural decision you can defend (why multiple weighted algorithms instead of one), a real technical challenge (multi-source config-driven design), and evidence of judgment (you debugged and improved the AI's output, not just accepted it).</p>
+
+  <div class="block-title">Trade-off — the honest caveat</div>
+  <p>Frame it precisely: "I acted as architect and reviewer — AI wrote the implementation, I made the design decisions, caught the issues, and drove the direction." This is more credible than either extreme (claiming to have hand-typed everything, or implying you just accepted AI output uncritically). Interviewers respect the accurate framing more than an inflated one.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The most senior part of the job wasn't writing code — it was making the architectural calls: which matching algorithms to combine and how to weight them, how to structure config so a new watchlist source doesn't require touching the matching engine, and catching when the AI's first pass missed an edge case. That's the same judgment a Tech Lead role needs, just applied with a different tool in hand."</p>
+  </div>
+</section>
+
+<section class="panel" id="agentic" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>What "Agentic AI" Actually Means</h2>
+  <div class="tagline">The difference between a chatbot and an agent is loops and tools</div>
+
+  <p><b>Define:</b> A chatbot answers one question and stops. An "agentic" system can plan a multi-step task, call tools/functions to take real actions (read a file, run code, call an API), observe the result, and decide the next step — looping until the goal is done, without a human in the loop for every step.</p>
+
+  <div class="analogy"><b>Analogy:</b> A chatbot is a knowledgeable friend you call for advice — they tell you what to do, but you go do it. An agent is a friend who says "give me the keys, I'll go handle it," checks in only if something unexpected comes up, and comes back when it's done.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Real engineering tasks (build this API, fix this bug, refactor this module) aren't single-shot Q&A — they require exploring a codebase, making a change, running tests, seeing what broke, and iterating. Agentic tools like Copilot's agent mode or Claude Code close that loop instead of requiring a human to manually paste code back and forth at every step.</p>
+
+  <div class="block-title">My real example</div>
+  <p>Building the sanctions API wasn't one prompt producing one file — it was an iterative loop: propose an architecture, have Copilot implement a piece, run it, hit an issue (a matching edge case, a config bug), diagnose it, and redirect the next iteration. That loop — direct, implement, observe, redirect — is the practical shape of working with an agentic tool, even without deep knowledge of the orchestration internals.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Where agents help most</span>Well-scoped, verifiable tasks (tests pass/fail, code compiles) where iteration is cheap.</div>
+    <div class="avoid-box"><span class="lbl">Where human judgment stays essential</span>Architectural decisions, security-sensitive code, ambiguous requirements — agents can drift confidently in a wrong direction without a reviewer checking in.</div>
+  </div>
+</section>
+
+<section class="panel" id="prompting" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Prompt Engineering Patterns</h2>
+  <div class="tagline">The handful of habits that actually move the needle in practice</div>
+
+  <ul style="font-size:14.5px;">
+    <li><b>Be specific about constraints, not just goals.</b> "Add fuzzy matching" is weak. "Add fuzzy matching using token-sort-ratio, weighted at 40% of the composite score, following the existing IMatcher interface" gets a usable result on the first pass.</li>
+    <li><b>Show, don't just tell — give an example of the shape you want.</b> Pasting one existing matcher class as a pattern to follow produces far more consistent output than describing the pattern in prose.</li>
+    <li><b>Ask for the plan before the code, on non-trivial tasks.</b> Having the AI outline its approach first lets you catch a wrong direction before dozens of lines of code are generated around it.</li>
+    <li><b>Iterate in small verifiable steps</b> rather than one giant "build the whole feature" prompt — matches the same instinct as small, reviewable pull requests.</li>
+  </ul>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The habit that improved my results the most was asking for a plan before code on anything non-trivial — it turns a review into catching a wrong assumption in one paragraph, instead of catching it after 200 lines of generated code built on that assumption."</p>
+  </div>
+</section>
+
+<section class="panel" id="mcp" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>MCP — Model Context Protocol</h2>
+  <div class="tagline">A standard way for an AI model to discover and call external tools, instead of a bespoke integration per tool</div>
+
+  <p><b>Define:</b> MCP is an open protocol that lets an AI assistant connect to external data sources and tools (a database, a file system, an API like Slack or GitHub) through a standard interface, rather than every AI product needing a custom-built integration for every tool.</p>
+
+  <div class="analogy"><b>Analogy:</b> Before USB, every peripheral needed its own proprietary port and driver — a printer port, a mouse port, a scanner port. USB standardized the connection so any compliant device works with any compliant computer. MCP is doing the same thing for AI-to-tool connections — one protocol, many tools, many AI clients, instead of a custom integration per pair.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Without a standard, connecting an AI assistant to your company's internal ticketing system, database, and Slack each requires a separate, bespoke integration — N tools × M AI clients means N×M integrations. A shared protocol turns that into N+M: build one MCP server per tool, and any MCP-compatible client can use it.</p>
+
+  <div class="block-title">Core pieces</div>
+  <p><b>MCP Server:</b> exposes a tool/data source (e.g. "query this Postgres database") via the protocol. <b>MCP Client:</b> the AI application (e.g. Claude, an IDE) that discovers and calls what the server exposes. <b>Tools:</b> the specific actions/functions a server exposes for the model to call, with structured inputs and outputs.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Where it pays off</span>Any org connecting AI assistants to multiple internal systems — the standardization avoids N×M integration cost.</div>
+    <div class="avoid-box"><span class="lbl">Where it's overhead</span>A single one-off integration for a single tool used by a single AI client — a direct API call may be simpler than standing up a full MCP server for it.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"MCP is solving the same integration-explosion problem that standards like ODBC or USB solved in their domains — turning an N×M integration problem into N+M by standardizing how an AI model discovers and calls a tool. I'd frame it as infrastructure for connecting AI to systems, not a feature of any one AI product."</p>
+  </div>
+</section>
+
+<section class="panel" id="reviewer" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The Architect-Reviewer Role</h2>
+  <div class="tagline">This is the framing that maps your AI experience directly onto the Tech Lead job description</div>
+
+  <p><b>The core argument:</b> A Tech Lead's job was never "write every line of code" — it's making architectural decisions, reviewing others' work for correctness and design quality, and catching issues before they compound. Working with AI as an "architect/reviewer" is the same skill, just applied to a different kind of contributor.</p>
+
+  <div class="block-title">Concrete parallels to draw</div>
+  <ul style="font-size:14.5px;">
+    <li>Reviewing a junior dev's PR for missed edge cases ↔ reviewing Copilot's generated matching logic for missed edge cases</li>
+    <li>Setting architectural constraints for a team ↔ setting the interface contracts (IMatcher) and config-driven structure that AI-generated code had to follow</li>
+    <li>Catching a design smell before it ships ↔ catching that a naive single-algorithm matcher wouldn't handle transliteration variance, and redirecting toward the weighted multi-algorithm approach</li>
+  </ul>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I think the architect-reviewer skill set is exactly what transfers to a Tech Lead role, regardless of whether the 'contributor' is a person or an AI tool — the job is the same: set the direction, review critically, catch what's wrong before it compounds. If anything, working this way daily has sharpened my code review instincts, because I'm doing it constantly instead of only during scheduled PR reviews."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">30-second version of your AI story</div><div class="a">Built a production sanctions screening API — architect/reviewer role, AI implemented, weighted multi-algorithm matching across multiple watchlist sources, config-driven design.</div></div>
+    <div class="qa-item"><div class="q">Agentic vs chatbot, in one line?</div><div class="a">A chatbot answers; an agent plans, acts via tools, observes results, and loops until the task is done.</div></div>
+    <div class="qa-item"><div class="q">MCP in one line?</div><div class="a">A standard protocol so any AI client can call any compliant tool/data source, avoiding a custom integration per tool-client pair.</div></div>
+    <div class="qa-item"><div class="q">What's the single most valuable prompting habit?</div><div class="a">Asking for a plan before code on non-trivial tasks, to catch wrong assumptions early and cheaply.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 05 — AGENTIC AI / COPILOT / MCP · Interview Prep Series</footer>
+</body>
+</html>
