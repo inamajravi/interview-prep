@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock Interview Drill — Final Prep</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 10 / Final Prep</div>
+  <h1>Mock Interview Drill</h1>
+  <p>Cross-domain, rapid-fire, no reference material. Cover the answer, read the question out loud, answer in the Define → Why → Example → Trade-off shape, then check yourself. Do this the night before and the morning of.</p>
+  <div class="stamp">TARGET: under 45 seconds per answer, out loud</div>
+</header>
+<nav>
+  <a href="#warmup">01 Warm-up (Your Story)</a>
+  <a href="#architecture">02 Architecture</a>
+  <a href="#dotnet">03 .NET / Spring</a>
+  <a href="#angular">04 Angular</a>
+  <a href="#cloud">05 Cloud</a>
+  <a href="#curveball">06 Curveballs</a>
+  <a href="#closing">07 Closing Move</a>
+</nav>
+<main>
+
+<section class="panel" id="warmup" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Warm-up — Your Story</h2>
+  <div class="tagline">These will come first. Have them loaded and ready, no hesitation.</div>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Walk me through a project you're proud of.</div><div class="a">Sanctions screening API — architect/reviewer with AI implementing. Lead with the domain complexity (weighted multi-algorithm matching across multiple watchlist sources), not the tools.</div></div>
+    <div class="qa-item"><div class="q">Tell me about a time you disagreed with a technical decision.</div><div class="a">Pull a real one from your own experience — interviewers can tell a generic STAR answer apart from a specific one. Anchor it in an architecture trade-off you actually navigated.</div></div>
+    <div class="qa-item"><div class="q">How do you approach mentoring or leading a team technically?</div><div class="a">Frame around the architect-reviewer pattern: setting constraints upfront, reviewing critically, catching issues before they compound — same skill whether the contributor is a junior dev or an AI tool.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="architecture" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Architecture — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">When would you NOT use microservices?</div><div class="a">Small team, small domain, early-stage product — pay the distributed-systems tax only once you need the benefit of independent deployment/scaling.</div></div>
+    <div class="qa-item"><div class="q">Does CQRS require two databases?</div><div class="a">No — can be two models against one database; two stores is an optimization added only when read/write scaling genuinely diverges.</div></div>
+    <div class="qa-item"><div class="q">How do you handle a transaction spanning two microservices?</div><div class="a">Saga pattern — sequence of local transactions with compensating actions on failure, not a distributed transaction.</div></div>
+    <div class="qa-item"><div class="q">What's a Bounded Context, and why does it matter for microservices?</div><div class="a">An explicit boundary where a domain term has one specific meaning — a natural seam for drawing microservice boundaries around real business capabilities.</div></div>
+    <div class="qa-item"><div class="q">Choreography vs orchestration for a multi-step workflow — which do you default to?</div><div class="a">Orchestration once steps exceed 3-4, for observability; choreography for simpler, fully decoupled reactions.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="dotnet" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>.NET / Spring — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What breaks if you inject a Scoped service into a Singleton?</div><div class="a">Captive dependency — scoped instance gets pinned to singleton lifetime, breaking per-request isolation.</div></div>
+    <div class="qa-item"><div class="q">Why doesn't async/await make one operation faster?</div><div class="a">It frees the thread during I/O wait rather than speeding up the I/O itself — throughput gain, not latency gain, for a single call.</div></div>
+    <div class="qa-item"><div class="q">Fastest fix for N+1 queries?</div><div class="a">Eager loading (.Include() in EF Core, JOIN FETCH / @EntityGraph in JPA) instead of lazy-loading inside a loop.</div></div>
+    <div class="qa-item"><div class="q">Default Spring bean scope, and why does it surprise .NET developers?</div><div class="a">Singleton — unlike .NET where scoped-per-request is the common default for web-facing services, so mutable state on a default Spring bean is shared across every request.</div></div>
+    <div class="qa-item"><div class="q">What is @Transactional doing under the hood?</div><div class="a">AOP proxy wrapping the method to start/commit/rollback a transaction — declarative version of manually wrapping code in a transaction block.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="angular" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Angular — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">OnPush component isn't updating — first thing you check?</div><div class="a">Is state mutated in place instead of reassigned? OnPush only reacts to reference changes.</div></div>
+    <div class="qa-item"><div class="q">Typeahead search box — which RxJS operator, and why?</div><div class="a">switchMap — cancels the stale in-flight request when a new keystroke arrives; only the latest result matters.</div></div>
+    <div class="qa-item"><div class="q">When is NgRx overkill?</div><div class="a">Small-to-medium apps without complex cross-feature state — boilerplate cost outweighs traceability benefit; a BehaviorSubject-backed service is often enough.</div></div>
+    <div class="qa-item"><div class="q">Why do Signals not need Zone.js-style tree-wide checks?</div><div class="a">Dependencies are tracked explicitly at point of use, so Angular knows exactly what needs updating.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="cloud" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Cloud (AWS/Azure) — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Prerequisite for horizontal scaling to actually work?</div><div class="a">Statelessness — session state externalized, not held in-process.</div></div>
+    <div class="qa-item"><div class="q">When is serverless (Lambda/Functions) the wrong choice?</div><div class="a">Sustained high, predictable throughput (cost), or latency-sensitive workloads (cold starts).</div></div>
+    <div class="qa-item"><div class="q">ALB vs NLB — deciding question?</div><div class="a">Do I need to route based on HTTP content? Yes → ALB (Layer 7). No, just raw fast TCP → NLB (Layer 4).</div></div>
+    <div class="qa-item"><div class="q">One event, three independent downstream reactions — which pattern?</div><div class="a">Fan-out: SNS to multiple SQS queues (AWS) or a Service Bus Topic with multiple subscriptions (Azure).</div></div>
+    <div class="qa-item"><div class="q">Why put an API gateway (APIM) in front of microservices?</div><div class="a">Centralize auth, rate limiting, versioning — avoid duplicating cross-cutting concerns per service.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="curveball" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Curveballs — Questions Designed to Catch Overconfidence</h2>
+  <div class="tagline">These test judgment, not recall. The "I don't know, here's how I'd find out" answer is often the right one.</div>
+  <div class="qa">
+    <div class="qa-item"><div class="q">"You said you used AI to build that API — so what did YOU actually do?"</div><div class="a">Be specific and concrete: the architectural decisions (algorithm choice and weighting), the interface contracts, the bugs you personally diagnosed, the improvements you proactively identified. Never get defensive — restate the architect/reviewer framing calmly.</div></div>
+    <div class="qa-item"><div class="q">"How would you handle a disagreement with a senior engineer who wants a different architecture?"</div><div class="a">Show you'd engage with their reasoning first, identify the actual trade-off being debated, and escalate to data/prototyping rather than authority if it's not resolved — avoid a pure "I'd just explain why I'm right" answer.</div></div>
+    <div class="qa-item"><div class="q">A question on a tool/topic you genuinely don't know well</div><div class="a">Use your partial-knowledge rule: "I know [related/adjacent thing] well — on this specific piece my understanding is more surface-level, so I'd want to validate it rather than guess." This is a stronger answer than bluffing.</div></div>
+    <div class="qa-item"><div class="q">"Walk me through how you'd design X" (unfamiliar system, on the spot)</div><div class="a">Narrate your process out loud: clarify requirements/scale first, identify the core domain entities, propose a first-pass architecture, then explicitly name the trade-offs of your choice. The process matters more than landing on a "perfect" answer.</div></div>
+  </div>
+</section>
+
+<section class="panel" id="closing" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Closing Move</h2>
+  <div class="tagline">The last impression, and the one thing worth repeating if you get the chance</div>
+  <div class="say-box">
+    <span class="lbl">If asked "anything else you'd like to add?"</span>
+    <p>"The thread running through everything I've talked about is that the Tech Lead job is fundamentally about architectural judgment and review discipline — whether that's reviewing a teammate's PR, weighing microservices trade-offs, or directing AI-generated code toward a specific design. I've been applying that same discipline daily, and I'd bring it directly into this role."</p>
+  </div>
+  <div class="block-title">Final checklist before you walk in</div>
+  <ul style="font-size:14.5px;">
+    <li>Can you say your AI/sanctions-API story in under 30 seconds, unprompted, calmly?</li>
+    <li>Do you have one specific trade-off story ready for Architecture, .NET/Spring, Angular, and Cloud each?</li>
+    <li>Have you rehearsed the "I don't know X well, but here's Y" phrasing out loud at least once?</li>
+    <li>Do you have 2-3 thoughtful questions ready to ask them about the role/team?</li>
+  </ul>
+</section>
+
+</main>
+<footer>BLUEPRINT 10 — MOCK INTERVIEW DRILL · Interview Prep Series · Good luck.</footer>
+</body>
+</html>
