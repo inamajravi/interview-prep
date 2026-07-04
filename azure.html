@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 09 / Cloud</div>
+  <h1>Azure for Architects</h1>
+  <p>AKS, Functions, Service Bus, and APIM — the Azure equivalents of the AWS services you just covered, framed the same way: when to reach for each, and when not to.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#aks">01 AKS</a>
+  <a href="#functions">02 Azure Functions</a>
+  <a href="#servicebus">03 Service Bus</a>
+  <a href="#apim">04 APIM</a>
+  <a href="#drill">05 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="aks" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>AKS — Azure Kubernetes Service</h2>
+  <div class="tagline">Managed Kubernetes — Azure runs the control plane, you run the workloads</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS EKS</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure AKS</span>
+  </div>
+
+  <p><b>Define:</b> AKS is Azure's managed Kubernetes offering — Azure operates and patches the Kubernetes control plane (API server, etcd, scheduler) for you, while you manage the worker nodes and deploy your containerized workloads onto them.</p>
+
+  <div class="analogy"><b>Analogy:</b> Running your own Kubernetes cluster is like being both the airline and the airport authority — building runways, air traffic control, everything. AKS is booking a flight — the airline (Azure) handles the runway, air traffic control, and safety inspections; you just show up with your cargo (containers) to ship.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Kubernetes itself is powerful but operationally heavy — running your own control plane means you own etcd backups, API server upgrades, and certificate rotation. AKS removes that burden, letting teams focus on workloads (Deployments, Services, Ingress) rather than cluster operations.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>You genuinely need Kubernetes' flexibility — complex multi-service deployments, need for fine-grained orchestration control, multi-cloud portability is a real requirement.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>A simpler PaaS (Azure App Service, Container Apps) meets the need — Kubernetes' operational complexity (networking, RBAC, autoscaling config) is real overhead most small-to-medium apps don't need.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'd only reach for AKS once the app genuinely needs Kubernetes' orchestration flexibility — for most services, a simpler PaaS option gets you to production faster with far less operational surface area to own. Kubernetes is a powerful default that's frequently over-selected for problems that don't need it."</p>
+  </div>
+</section>
+
+<section class="panel" id="functions" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Azure Functions</h2>
+  <div class="tagline">Azure's serverless compute — same idea as Lambda, different triggers ecosystem</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS Lambda</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure Functions</span>
+  </div>
+
+  <p><b>Define:</b> Event-triggered, serverless compute — code runs in response to a trigger (HTTP request, queue message, timer, blob upload) without you managing a server, billed per execution.</p>
+
+  <div class="block-title">Hosting plan trade-off — the interview-relevant detail</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Consumption plan</span>True pay-per-execution, scales to zero — cheapest for infrequent workloads, but has the same cold-start latency issue as Lambda.</div>
+    <div class="avoid-box"><span class="lbl">Premium / Dedicated plan</span>Pre-warmed instances (no cold start), predictable cost, VNet integration — the fix when Consumption's cold starts are unacceptable, at higher baseline cost.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The plan choice is the real architectural decision with Functions — Consumption gives you true pay-per-use but with cold starts, Premium trades some of that cost efficiency for pre-warmed instances when latency matters. I'd pick based on the specific latency tolerance of the trigger, not default to Consumption everywhere."</p>
+  </div>
+</section>
+
+<section class="panel" id="servicebus" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Service Bus</h2>
+  <div class="tagline">Azure's enterprise messaging — combines what SQS and SNS do separately, plus more</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS SQS + SNS</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure Service Bus (Queues + Topics)</span>
+  </div>
+
+  <p><b>Define:</b> Service Bus offers both <b>Queues</b> (point-to-point, one consumer per message — like SQS) and <b>Topics</b> (pub/sub, multiple subscriptions each get a copy — like SNS's fan-out), unified in one service, plus enterprise features like message sessions (ordered processing per session key) and duplicate detection built in.</p>
+
+  <div class="analogy"><b>Analogy:</b> Where AWS gives you a deli-ticket queue (SQS) and a separate fire alarm (SNS) as two different products, Service Bus is one building with both a ticket counter and an alarm system built into the same management console.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Need for both patterns in one Azure-native service, or need Service Bus's extra enterprise features (sessions, transactions, dead-lettering) baked in.</div>
+    <div class="avoid-box"><span class="lbl">Consider Event Grid instead when</span>Need lightweight, high-scale event routing (closer to a pure event bus) rather than message queuing semantics — Service Bus is heavier-weight and more feature-rich than needed for simple event notification.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Service Bus unifies the SQS-style queue and SNS-style topic pattern I'd reach for on AWS into one service, with enterprise extras like ordered sessions and dead-lettering built in. For lightweight event routing without those enterprise needs, I'd consider Event Grid instead — it's a lighter-weight option, similar to the distinction between SNS and a heavier message broker."</p>
+  </div>
+</section>
+
+<section class="panel" id="apim" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>APIM — API Management</h2>
+  <div class="tagline">A single front door for all your APIs — auth, rate limiting, versioning, in one place</div>
+
+  <p><b>Define:</b> APIM sits in front of your backend APIs as a gateway, handling cross-cutting concerns centrally: authentication/authorization, rate limiting/throttling, request/response transformation, versioning, and analytics — without every backend service reimplementing them.</p>
+
+  <div class="analogy"><b>Analogy:</b> A hotel's front desk is APIM — guests (API consumers) don't walk directly into the kitchen, housekeeping, or maintenance departments (individual backend services); they go through one front desk that checks identity, manages requests, and routes them appropriately.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Without a gateway, every microservice needs its own auth, rate limiting, and API-key management — duplicated logic and inconsistent enforcement. APIM centralizes it, and also decouples the public-facing API contract from internal service changes (you can version and transform without touching backend code).</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Multiple APIs need consistent auth/throttling/versioning policy, or you're exposing internal services externally and need a controlled public contract.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>A single small internal service with no need for a public contract or centralized policy — adds a network hop and operational component for no real benefit yet.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"APIM's real value is centralizing cross-cutting API concerns — auth, throttling, versioning — so individual services don't each reimplement them inconsistently. I'd bring it in once I have multiple APIs needing that consistent policy, or when I'm exposing internal services externally and need a stable public contract decoupled from internal changes."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">AKS equivalent on AWS?</div><div class="a">EKS — both are managed Kubernetes control planes.</div></div>
+    <div class="qa-item"><div class="q">Azure Functions plan for latency-sensitive triggers?</div><div class="a">Premium/Dedicated — avoids Consumption plan's cold starts, at higher baseline cost.</div></div>
+    <div class="qa-item"><div class="q">Service Bus feature with no direct SQS/SNS equivalent?</div><div class="a">Message sessions — ordered processing grouped by a session key, plus built-in duplicate detection.</div></div>
+    <div class="qa-item"><div class="q">Why put APIM in front of microservices?</div><div class="a">Centralize auth, rate limiting, versioning, and transformation instead of duplicating them per service.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 09 — AZURE · Interview Prep Series</footer>
+</body>
+</html>
