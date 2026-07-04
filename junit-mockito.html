@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JUnit & Mockito — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 04 / Testing</div>
+  <h1>JUnit & Mockito — Mapped from .NET</h1>
+  <p>Same testing instincts you already have with xUnit and Moq — different attributes and method names. Spring Boot Test layers and Testcontainers are the two genuinely new ideas worth understanding deeply.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#junit">01 JUnit 5 Basics</a>
+  <a href="#mockito">02 Mockito</a>
+  <a href="#springtest">03 Spring Boot Test Layers</a>
+  <a href="#testcontainers">04 Testcontainers</a>
+  <a href="#drill">05 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="junit" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>JUnit 5 Basics</h2>
+  <div class="tagline">Same xUnit patterns, different annotations</div>
+
+  <div class="mapping">
+    <span class="dotnet">[Fact] / [Theory] / [InlineData]</span>
+    <span class="arrow">↔</span>
+    <span class="spring">@Test / @ParameterizedTest / @ValueSource</span>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">xUnit (.NET)</span>
+      <pre><code>[Theory]
+[InlineData("SDN", true)]
+[InlineData("UN", true)]
+public void Screen_KnownList_Matches(
+    string list, bool expected) {
+  var result = _svc.Screen(list, "John Doe");
+  Assert.Equal(expected, result.IsMatch);
+}</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">JUnit 5</span>
+      <pre><code>@ParameterizedTest
+@ValueSource(strings = {"SDN", "UN"})
+void screen_KnownList_Matches(String list) {
+  var result = svc.screen(list, "John Doe");
+  assertTrue(result.isMatch());
+}</code></pre>
+    </div>
+  </div>
+
+  <p><b>Lifecycle mapping:</b> <code>[assembly: ...]</code> setup/teardown → <code>@BeforeEach</code>/<code>@AfterEach</code> (per test) and <code>@BeforeAll</code>/<code>@AfterAll</code> (once per class, must be static unless <code>@TestInstance(PER_CLASS)</code> is set — a small gotcha .NET devs hit since xUnit doesn't require statics for the equivalent).</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"JUnit 5's annotation model maps almost directly onto xUnit — Fact/Theory become Test/ParameterizedTest. The one habit I'd build fast is JUnit 5's per-class vs per-method test instance lifecycle, since it changes whether BeforeAll needs to be static."</p>
+  </div>
+</section>
+
+<section class="panel" id="mockito" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Mockito</h2>
+  <div class="tagline">Same mocking philosophy as Moq — arrange, act, assert, verify</div>
+
+  <div class="mapping">
+    <span class="dotnet">Mock&lt;T&gt; + Setup + Verify</span>
+    <span class="arrow">↔</span>
+    <span class="spring">@Mock + when(...).thenReturn(...) + verify(...)</span>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">Moq (.NET)</span>
+      <pre><code>var mock = new Mock&lt;IMatcher&gt;();
+mock.Setup(m => m.Score(It.IsAny&lt;string&gt;()))
+    .Returns(0.95);
+var svc = new ScreeningService(mock.Object);
+svc.Screen("John Doe");
+mock.Verify(m => m.Score("John Doe"), Times.Once);</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Mockito</span>
+      <pre><code>IMatcher mock = mock(IMatcher.class);
+when(mock.score(anyString())).thenReturn(0.95);
+ScreeningService svc = new ScreeningService(mock);
+svc.screen("John Doe");
+verify(mock, times(1)).score("John Doe");</code></pre>
+    </div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> Both frameworks are hiring a stunt double for a scene — you tell the double exactly what to do when cued (Setup/when-thenReturn), then check afterward the director actually called on them the right number of times (Verify).</div>
+
+  <div class="block-title">Trade-off / common trap</div>
+  <div class="avoid-box"><span class="lbl">Over-mocking</span>Mocking too deeply (mocking value objects, or mocking classes you own instead of testing them directly) is the same anti-pattern in both ecosystems — mock at architectural seams (external dependencies, interfaces), not everywhere.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Mockito's when/thenReturn plus verify is functionally identical to Moq's Setup/Verify — same arrange-act-assert discipline. The judgment call that matters more than syntax is where to mock: at real architectural seams, not on every collaborator, or your tests end up just testing your mocks."</p>
+  </div>
+</section>
+
+<section class="panel" id="springtest" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Spring Boot Test Layers</h2>
+  <div class="tagline">A genuinely new idea worth understanding well — sliced tests that load only part of the app</div>
+
+  <p><b>Define:</b> Spring Boot Test provides annotations that load a partial application context tailored to a layer, instead of the whole app, making tests both faster and more focused:</p>
+  <ul style="font-size:14.5px;">
+    <li><code>@WebMvcTest</code> — loads only the web layer (controllers, filters), mocks everything below it. Roughly equivalent to testing an ASP.NET Core controller with `TestServer`/`WebApplicationFactory` but scoped even narrower.</li>
+    <li><code>@DataJpaTest</code> — loads only JPA repositories against an in-memory or test database, rolling back after each test.</li>
+    <li><code>@SpringBootTest</code> — loads the full application context, closest equivalent to a true .NET integration test using `WebApplicationFactory`.</li>
+  </ul>
+
+  <div class="analogy"><b>Analogy:</b> Testing a car's brakes doesn't require driving the whole car on a highway — you put just the brake assembly on a test rig. Slice tests are exactly that: load only the "assembly" you're testing, not the whole running app.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Loading the full Spring context for every test is slow — hundreds of controller tests each booting the whole app adds up fast. Slice annotations keep the fast majority of tests fast, reserving full-context <code>@SpringBootTest</code> for genuine end-to-end integration tests.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use slices when</span>Testing one layer's logic in isolation — fast feedback, most of your test suite should live here.</div>
+    <div class="avoid-box"><span class="lbl">Use full @SpringBootTest when</span>You genuinely need to verify layers wired together correctly — sparingly, since it's the slowest test type.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"This is the one piece of Spring testing that's genuinely different from .NET's WebApplicationFactory-centric integration testing — slice annotations like @WebMvcTest and @DataJpaTest let most of the test suite stay fast by loading only the relevant layer, reserving full @SpringBootTest for real integration coverage."</p>
+  </div>
+</section>
+
+<section class="panel" id="testcontainers" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Testcontainers</h2>
+  <div class="tagline">Real Postgres/Kafka/Redis in a Docker container, spun up just for the test run</div>
+
+  <p><b>Define:</b> A library that spins up real dependencies (a real Postgres, real Kafka, real Redis) inside lightweight Docker containers, scoped to your test run, then tears them down — instead of mocking the database or relying on a flaky shared test environment.</p>
+
+  <div class="analogy"><b>Analogy:</b> Instead of rehearsing a play with a stand-in prop sword, you rehearse with the actual sword for one rehearsal — safely, in a controlled setting, then it goes back in the case. You get real behavior, not an approximation, without permanent risk.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>In-memory fakes (like H2 standing in for real Postgres) can behave subtly differently from production databases — different SQL dialect quirks, different constraint behavior. Testcontainers closes that gap by testing against the real thing, just ephemeral and isolated.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use for</span>Integration tests where DB-specific behavior matters (constraints, migrations, real SQL dialect quirks).</div>
+    <div class="avoid-box"><span class="lbl">Cost</span>Requires Docker in the CI environment and is slower than in-memory fakes — reserve for integration-level tests, not every unit test.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Testcontainers solves the 'my tests pass against H2 but fail against real Postgres in production' problem — it trades a bit of speed and a Docker dependency in CI for testing against the real database engine. I'd use it for integration-level DB tests, not as a blanket replacement for fast unit tests."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">[Fact] equivalent in JUnit 5?</div><div class="a">@Test</div></div>
+    <div class="qa-item"><div class="q">Moq's Setup(...).Returns(...) equivalent?</div><div class="a">Mockito's when(...).thenReturn(...)</div></div>
+    <div class="qa-item"><div class="q">Fastest way to test just a controller in Spring?</div><div class="a">@WebMvcTest — loads only the web layer, mocks the rest.</div></div>
+    <div class="qa-item"><div class="q">Why use Testcontainers over an in-memory H2 database?</div><div class="a">Real database engine behavior (SQL dialect, constraints) instead of an approximation that can behave subtly differently.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 04 — JUNIT & MOCKITO · Interview Prep Series</footer>
+</body>
+</html>
