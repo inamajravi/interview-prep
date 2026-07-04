@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 03 / Angular</div>
+  <h1>Angular Deep Dive</h1>
+  <p>Change Detection, Signals, RxJS, Standalone Components, and State Management — the parts of Angular that separate "I've used it" from "I understand why it's built this way."</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#cd">01 Change Detection</a>
+  <a href="#signals">02 Signals</a>
+  <a href="#rxjs">03 RxJS Operators</a>
+  <a href="#standalone">04 NgModules vs Standalone</a>
+  <a href="#state">05 State Management</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="cd" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Change Detection — Default vs OnPush</h2>
+  <div class="tagline">How Angular decides what to re-render, and how you make it stop over-checking</div>
+
+  <p><b>Define:</b> <b>Default</b> strategy checks every component in the tree on every change-detection cycle (triggered by any event, timer, or async operation via Zone.js). <b>OnPush</b> only re-checks a component when its <code>@Input()</code> reference changes, an event originates from inside it, or an observable it's subscribed to (via the async pipe) emits.</p>
+
+  <div class="analogy"><b>Analogy:</b> Default is a teacher checking every single student's work after every single question, all 40 students, all the time. OnPush is a teacher who only checks a student's work when that student raises their hand — far less wasted effort, but you must remember to actually raise your hand (emit a new reference) or the teacher will assume nothing changed.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>In a large app, Default's "check everything, every time" doesn't scale — a click anywhere can trigger a full-tree check. OnPush is an opt-in performance contract: you promise the component only needs re-checking on specific, well-defined triggers.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use OnPush when</span>The component's inputs are immutable/replaced-not-mutated, and you're building for scale or performance-sensitive views (large lists, dashboards).</div>
+    <div class="avoid-box"><span class="lbl">The classic trap</span>Mutating an object/array in place (e.g. <code>this.items.push(x)</code>) doesn't change the reference, so OnPush won't detect it — you must reassign (<code>this.items = [...this.items, x]</code>).</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"OnPush is a performance contract you're making with Angular — the component promises to only care about reference changes. The bug I always check for first when 'the UI isn't updating' with OnPush is a mutation instead of a reassignment somewhere upstream."</p>
+  </div>
+</section>
+
+<section class="panel" id="signals" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Signals</h2>
+  <div class="tagline">Fine-grained reactivity that tracks exactly what changed, not "did anything, maybe, somewhere"</div>
+
+  <p><b>Define:</b> A Signal is a reactive value container (<code>signal(0)</code>) that automatically tracks which parts of the template/computed values depend on it, and updates only those — no Zone.js, no tree-wide checks needed.</p>
+
+  <div class="analogy"><b>Analogy:</b> Zone.js-based change detection is like a fire alarm that goes off building-wide for any smoke anywhere. Signals are individual smoke detectors wired directly to the sprinkler above them — only the affected area reacts, because the dependency is explicit and direct.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Zone.js change detection can't know exactly what changed — it has to re-check broadly. Signals make dependencies explicit at the point of use, so Angular knows precisely which DOM bindings need updating, without needing OnPush's manual discipline about references.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>New code, especially performance-sensitive UI — Signals give OnPush-like precision without OnPush's mutation gotchas.</div>
+    <div class="avoid-box"><span class="lbl">Migration reality</span>Existing large RxJS-based codebases can't switch overnight — Signals and RxJS interop (toSignal/toObservable) exist specifically for gradual migration, not a rip-and-replace.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Signals solve the same problem OnPush does — avoiding tree-wide checks — but by making dependencies explicit rather than relying on the developer remembering reference-immutability discipline. I'd treat adopting them in an existing codebase as incremental, using the RxJS interop rather than a big-bang rewrite."</p>
+  </div>
+</section>
+
+<section class="panel" id="rxjs" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>RxJS Operators</h2>
+  <div class="tagline">The handful of operators that show up in nearly every real Angular app</div>
+
+  <div class="block-title">switchMap vs mergeMap vs concatMap vs exhaustMap</div>
+  <p><b>Analogy — same "search box calling an API" scenario, four different behaviors:</b></p>
+  <ul style="font-size:14.5px;">
+    <li><b>switchMap</b> — a search-as-you-type box: cancels the previous in-flight request the moment a new keystroke fires. Use for: typeaheads, "only the latest result matters."</li>
+    <li><b>mergeMap</b> — firing multiple file uploads in parallel, all running concurrently, no cancellation. Use for: independent parallel operations.</li>
+    <li><b>concatMap</b> — a queue of emails that must send in order, one fully completing before the next starts. Use for: order-sensitive sequential operations.</li>
+    <li><b>exhaustMap</b> — a login button that ignores further clicks until the current login attempt finishes. Use for: ignoring new triggers while one is in flight.</li>
+  </ul>
+
+  <div class="block-title">Why it exists</div>
+  <p>Async operations that themselves return observables (an HTTP call inside a stream) need a defined strategy for handling overlap — these four operators are really just four different overlap-handling policies, not four unrelated tools.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I pick these four by asking one question: what should happen if a new trigger fires while the last one's still in flight? Cancel and restart → switchMap. Run both → mergeMap. Queue it → concatMap. Ignore it → exhaustMap. That framing is more useful in an interview than memorizing definitions."</p>
+  </div>
+
+  <div class="block-title">Trade-off / common bug</div>
+  <div class="avoid-box"><span class="lbl">Memory leaks</span>Manual <code>.subscribe()</code> calls that are never unsubscribed leak memory as components are destroyed and recreated. Fix: the <code>async</code> pipe in templates (auto-unsubscribes), or <code>takeUntilDestroyed()</code> in newer Angular versions.</div>
+</section>
+
+<section class="panel" id="standalone" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>NgModules vs Standalone Components</h2>
+  <div class="tagline">Angular removing a layer of ceremony that was mostly bookkeeping</div>
+
+  <p><b>Define:</b> NgModules (<code>@NgModule</code>) used to be mandatory — every component had to be declared in exactly one module, which controlled what it could inject and what could use it. Standalone components declare their own imports directly, no module required.</p>
+
+  <div class="analogy"><b>Analogy:</b> NgModules are like needing a company org chart updated every time you hire someone, just so they know who they can talk to. Standalone components are like each new hire just being handed their own contact list directly — less bureaucracy, same eventual connections.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Standalone benefit</span>Simpler mental model, better tree-shaking, less boilerplate for new projects — this is the default direction for new Angular apps now.</div>
+    <div class="avoid-box"><span class="lbl">Migration reality</span>Large existing NgModule-based codebases migrate incrementally — Angular supports both models interoperating, so it's not forced all-at-once.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Standalone components remove bookkeeping that NgModules required without adding new capability — it's the same DI and component model underneath, just less ceremony to wire up. For an existing large app, I'd migrate module-by-module rather than treat it as a rewrite."</p>
+  </div>
+</section>
+
+<section class="panel" id="state" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>State Management</h2>
+  <div class="tagline">BehaviorSubject vs NgRx vs Signals — matching the tool to the actual complexity</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">BehaviorSubject service</span>Simplest option — a service holding a BehaviorSubject, exposed as an Observable. Good for small-to-medium apps with straightforward shared state.</div>
+    <div class="avoid-box"><span class="lbl">When it breaks down</span>Once you need time-travel debugging, complex derived state, or many features touching the same state with unclear update order, plain BehaviorSubjects get tangled fast.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">NgRx</span>Redux pattern — single store, actions, reducers, effects for side-effects. Strong for large teams needing strict, traceable, testable state transitions.</div>
+    <div class="avoid-box"><span class="lbl">NgRx cost</span>Significant boilerplate (actions, reducers, selectors, effects per feature) — genuinely overkill for a small app; teams often over-adopt it too early.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Signals for state</span>Newer, lighter-weight option for local/moderate shared state — less ceremony than NgRx, more structure than a raw BehaviorSubject.</div>
+    <div class="avoid-box"><span class="lbl">Still maturing</span>Signal-based global state patterns are newer and less battle-tested at NgRx's scale for very large, multi-team apps.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I pick state management by actual complexity, not by default reaching for NgRx. A BehaviorSubject-backed service is enough for most feature-level shared state. I'd bring in NgRx specifically when I need traceable, testable state transitions across a large team — not because 'that's what Angular apps use.'"</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">UI not updating with OnPush — first thing to check?</div><div class="a">Is state being mutated in place instead of reassigned? OnPush only reacts to new references.</div></div>
+    <div class="qa-item"><div class="q">Typeahead search — which RxJS operator?</div><div class="a">switchMap — cancel the stale request when a new one comes in.</div></div>
+    <div class="qa-item"><div class="q">Why do Signals not need Zone.js?</div><div class="a">Dependencies are tracked explicitly at the point of use, so Angular knows exactly what to update, rather than needing to guess by re-checking broadly.</div></div>
+    <div class="qa-item"><div class="q">When is NgRx overkill?</div><div class="a">Small-to-medium apps without complex cross-feature state — the boilerplate cost outweighs the traceability benefit.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 03 — ANGULAR · Interview Prep Series</footer>
+</body>
+</html>
