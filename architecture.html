@@ -35,7 +35,7 @@
 
   <p><b>Define:</b> An application built as a set of small, independently deployable services, each with its own database, each responsible for one business capability, talking to each other over the network (usually HTTP/REST or messaging).</p>
 
-  <div class="analogy"><b>Analogy:</b> Think of a restaurant. A monolith is one chef doing everything — chopping, grilling, plating, billing — in one kitchen. If the grill breaks, the whole kitchen stops. Microservices is a restaurant with separate stations: a grill station, a salad station, a billing counter. Each has its own tools and staff. If the salad station has a bad day, the grill still serves steaks.</p>
+  <div class="analogy"><b>Analogy:</b> Think of a restaurant. A monolith is one chef doing everything — chopping, grilling, plating, billing — in one kitchen. If the grill breaks, the whole kitchen stops. Microservices is a restaurant with separate stations: a grill station, a salad station, a billing counter. Each has its own tools and staff. If the salad station has a bad day, the grill still serves steaks.</div>
 
   <div class="block-title">Why it exists</div>
   <p>Monoliths become painful at scale: one team's bug can take down the whole app, one slow module blocks the whole deployment pipeline, and you can't scale just the "hot" part of the app independently. Microservices let teams deploy independently, scale independently, and pick the right tech per service.</p>
@@ -74,7 +74,7 @@
 
   <p><b>Define:</b> Separate the model (and often the data path) used to update data (Commands) from the model used to read data (Queries). Writes go through a model optimized for business rules and consistency; reads go through a model optimized for the shape the UI actually needs.</p>
 
-  <div class="analogy"><b>Analogy:</b> A restaurant kitchen (writes) is optimized for correctly preparing food — order, checks, steps, quality control. The menu board (reads) is optimized for a customer glancing at it and deciding fast. You wouldn't force the customer to read the kitchen's ticket system, and you wouldn't run the kitchen off the menu board. Same underlying business (food), two very different shapes of "view" into it.</p>
+  <div class="analogy"><b>Analogy:</b> A restaurant kitchen (writes) is optimized for correctly preparing food — order, checks, steps, quality control. The menu board (reads) is optimized for a customer glancing at it and deciding fast. You wouldn't force the customer to read the kitchen's ticket system, and you wouldn't run the kitchen off the menu board. Same underlying business (food), two very different shapes of "view" into it.</div>
 
   <div class="block-title">Why it exists</div>
   <p>In many real systems, reads vastly outnumber writes, and the ideal shape for a write (normalized, validated, consistent) is completely different from the ideal shape for a read (denormalized, fast, sometimes eventually-consistent). One model trying to serve both ends up compromised for both.</p>
@@ -112,7 +112,7 @@
 
   <p><b>Define:</b> Instead of Service A directly calling Service B, Service A publishes an event ("OrderPlaced") to a broker (Kafka, RabbitMQ, SNS/SQS, Azure Service Bus). Any service that cares subscribes and reacts. The publisher doesn't know or care who's listening.</p>
 
-  <div class="analogy"><b>Analogy:</b> A notice board in an office versus phoning every single person individually. When something happens (a policy change), you pin one notice. HR reads it, Finance reads it, Facilities reads it — each acts in their own way, on their own time. You didn't have to know in advance who'd care, and adding a new department later doesn't mean changing your announcement process.</p>
+  <div class="analogy"><b>Analogy:</b> A notice board in an office versus phoning every single person individually. When something happens (a policy change), you pin one notice. HR reads it, Finance reads it, Facilities reads it — each acts in their own way, on their own time. You didn't have to know in advance who'd care, and adding a new department later doesn't mean changing your announcement process.</div>
 
   <div class="block-title">Why it exists</div>
   <p>Direct service-to-service calls create tight coupling — Service A must know about B, C, and D, and if any is slow or down, A is affected. Events decouple producers from consumers: producers don't know who's listening, and new consumers can be added without touching the producer at all.</p>
@@ -150,7 +150,7 @@
 
   <p><b>Define:</b> A sequence of local transactions across multiple services, where each step publishes an event/triggers the next step. If a step fails partway through, previously completed steps are undone using <b>compensating transactions</b> (not a database rollback — an explicit "reverse" action).</p>
 
-  <div class="analogy"><b>Analogy:</b> Booking a trip: reserve a flight, then a hotel, then a rental car. There's no single "transaction" spanning three different companies' systems. If the car rental fails, you don't get a magic rollback — you explicitly cancel the flight and the hotel. That explicit cancel-if-later-step-fails is exactly what a Saga's compensating transaction is.</p>
+  <div class="analogy"><b>Analogy:</b> Booking a trip: reserve a flight, then a hotel, then a rental car. There's no single "transaction" spanning three different companies' systems. If the car rental fails, you don't get a magic rollback — you explicitly cancel the flight and the hotel. That explicit cancel-if-later-step-fails is exactly what a Saga's compensating transaction is.</div>
 
   <div class="block-title">Why it exists</div>
   <p>In a monolith with one database, a failed step just rolls back the whole ACID transaction. Across microservices with separate databases, there's no shared transaction to roll back. Saga is how you get "all-or-nothing" behavior back, without a fragile distributed transaction (2PC) that locks resources across services.</p>
@@ -188,7 +188,7 @@
 
   <p><b>Define:</b> An approach where you structure code around the business domain rather than around technical layers, using a <b>Ubiquitous Language</b> (the exact terms the business uses) and dividing large domains into <b>Bounded Contexts</b> — explicit boundaries where a term means one specific thing.</p>
 
-  <div class="analogy"><b>Analogy:</b> The word "Customer" means something different to Sales (a lead with a budget) and to Support (someone with an active ticket history). DDD says: don't force one giant "Customer" class to serve both meanings. Give Sales its own bounded context with its own "Customer" model, and Support its own — and be explicit about how the two map to each other at the boundary, the same way two countries agree on a currency exchange rate rather than sharing one currency.</p>
+  <div class="analogy"><b>Analogy:</b> The word "Customer" means something different to Sales (a lead with a budget) and to Support (someone with an active ticket history). DDD says: don't force one giant "Customer" class to serve both meanings. Give Sales its own bounded context with its own "Customer" model, and Support its own — and be explicit about how the two map to each other at the boundary, the same way two countries agree on a currency exchange rate rather than sharing one currency.</div>
 
   <div class="block-title">Why it exists</div>
   <p>Large systems built purely around technical layers (controllers, services, repositories) tend to lose the business meaning — the code stops mapping to how the business actually thinks, and every change requires a translation exercise between "what the business asked for" and "which layer does that touch." DDD keeps code and business language in sync, and gives natural seams for microservice boundaries.</p>

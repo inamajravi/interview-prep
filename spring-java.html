@@ -43,7 +43,7 @@
 
   <p><b>Define:</b> Spring's <b>ApplicationContext</b> is the IoC container — exactly what .NET's built-in <code>IServiceCollection</code> / <code>IServiceProvider</code> is. You mark a class as a bean with <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, or <code>@Controller</code> (all specializations of <code>@Component</code>, just semantic labels), and Spring wires it into anything that asks for it.</p>
 
-  <div class="analogy"><b>Analogy:</b> Same as .NET — it's the hotel concierge who hands you what you need without you going and building it yourself. The only real difference is how you check in: in .NET you explicitly register at the front desk (<code>Program.cs</code>); in Spring, most rooms self-register just by wearing the right badge (<code>@Component</code>) and being in a scanned package.</p>
+  <div class="analogy"><b>Analogy:</b> Same as .NET — it's the hotel concierge who hands you what you need without you going and building it yourself. The only real difference is how you check in: in .NET you explicitly register at the front desk (<code>Program.cs</code>); in Spring, most rooms self-register just by wearing the right badge (<code>@Component</code>) and being in a scanned package.</div>
 
   <div class="block-title">Why it exists</div>
   <p>Identical reason to .NET: loose coupling, testability (swap real implementations for mocks), and centralizing object lifecycle instead of scattering <code>new</code> everywhere.</p>
@@ -113,7 +113,7 @@ public class ScreenController {
     </div>
   </div>
 
-  <div class="analogy"><b>Analogy:</b> Same reception desk, different uniform. The controller's job — receive the request, validate the shape, hand off to a service, return a response — is identical. You're not learning a new job, just a new dress code for the same role.</p>
+  <div class="analogy"><b>Analogy:</b> Same reception desk, different uniform. The controller's job — receive the request, validate the shape, hand off to a service, return a response — is identical. You're not learning a new job, just a new dress code for the same role.</div>
 
   <div class="block-title">Trade-off / things that differ</div>
   <div class="tradeoff-grid">
@@ -161,7 +161,7 @@ public class ScreenController {
     </div>
   </div>
 
-  <div class="analogy"><b>Analogy:</b> EF Core makes you write the sentence yourself (LINQ). Spring Data JPA is like a very literal assistant who writes the SQL just from reading the method's name out loud — <code>findByEmailAndActiveTrue</code> becomes a real query with zero code behind it, purely by naming convention.</p>
+  <div class="analogy"><b>Analogy:</b> EF Core makes you write the sentence yourself (LINQ). Spring Data JPA is like a very literal assistant who writes the SQL just from reading the method's name out loud — <code>findByEmailAndActiveTrue</code> becomes a real query with zero code behind it, purely by naming convention.</div>
 
   <div class="block-title">Trade-off</div>
   <div class="tradeoff-grid">
@@ -189,7 +189,7 @@ public class ScreenController {
 
   <p><b>Define:</b> <code>@SpringBootApplication</code> is really three annotations in one: <code>@Configuration</code> (this class can define beans), <code>@ComponentScan</code> (scan for <code>@Component</code>s), and <code>@EnableAutoConfiguration</code> (guess sensible defaults based on what's on the classpath — e.g., see a JPA driver on the classpath, auto-configure a DataSource and EntityManager).</p>
 
-  <div class="analogy"><b>Analogy:</b> .NET's minimal hosting (<code>WebApplication.CreateBuilder</code>) got closer to this over time, but Spring Boot pushes it further — it's like a smart hotel room that notices you packed running shoes and automatically sets up a gym pass, without you asking. Convenient, but you need to know it's happening so you're not surprised by config you never wrote.</p>
+  <div class="analogy"><b>Analogy:</b> .NET's minimal hosting (<code>WebApplication.CreateBuilder</code>) got closer to this over time, but Spring Boot pushes it further — it's like a smart hotel room that notices you packed running shoes and automatically sets up a gym pass, without you asking. Convenient, but you need to know it's happening so you're not surprised by config you never wrote.</div>
 
   <div class="block-title">Trade-off</div>
   <div class="tradeoff-grid">
@@ -223,7 +223,7 @@ public class ScreenController {
 
   <p><b>Define:</b> AOP lets you inject behavior (logging, security checks, transactions, retries) around method calls without modifying the method itself, by defining an "aspect" that matches a pattern of methods (a "pointcut") and runs code before/after/around them.</p>
 
-  <div class="analogy"><b>Analogy:</b> Same idea as airport security — it doesn't care which specific flight you're on, it applies the same check to <i>everyone passing through a certain gate</i>. An aspect says "anything matching this pattern of methods gets this behavior wrapped around it," without each method needing to know security exists.</p>
+  <div class="analogy"><b>Analogy:</b> Same idea as airport security — it doesn't care which specific flight you're on, it applies the same check to <i>everyone passing through a certain gate</i>. An aspect says "anything matching this pattern of methods gets this behavior wrapped around it," without each method needing to know security exists.</div>
 
   <div class="block-title">Why it exists</div>
   <p>Same motivation as .NET middleware or a decorator wrapping a service: logging, auth checks, caching, and transaction handling are needed across many unrelated methods, and hardcoding them into every method violates single-responsibility and creates repetition.</p>
