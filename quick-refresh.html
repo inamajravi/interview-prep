@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10-Minute Refresh — Interview Prep</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .refresh-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0 0;}
+  @media(max-width:640px){.refresh-grid{grid-template-columns:1fr;}}
+  .chip{
+    background:rgba(142,205,221,0.06);
+    border:1px solid rgba(142,205,221,0.25);
+    border-radius:4px;
+    padding:11px 14px;
+    font-size:13.5px;
+  }
+  .chip b{color:var(--amber); display:block; font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;}
+  .mini-panel{
+    border:1px solid rgba(142,205,221,0.35);
+    background:rgba(18,58,99,0.3);
+    border-radius:4px;
+    padding:18px 20px;
+    margin:22px 0;
+  }
+  .mini-panel h3{
+    font-family:var(--mono); font-size:15px; color:var(--blue-line);
+    margin:0 0 12px; text-transform:uppercase; letter-spacing:1px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .mini-panel h3 .n{color:var(--amber);}
+  .story-box{
+    background:var(--blue-deep);
+    border:1px solid var(--amber);
+    border-radius:4px;
+    padding:16px 18px;
+    margin:22px 0;
+    font-size:14.5px;
+  }
+  .story-box .lbl{color:var(--amber); font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:8px;}
+  .checklist{list-style:none; padding:0; margin:0;}
+  .checklist li{
+    padding:8px 0 8px 26px;
+    position:relative;
+    font-size:14px;
+    border-bottom:1px dashed rgba(142,205,221,0.15);
+  }
+  .checklist li:last-child{border-bottom:none;}
+  .checklist li::before{
+    content:"☐"; position:absolute; left:0; color:var(--blue-line); font-size:15px;
+  }
+  .timer-note{
+    text-align:center;
+    font-family:var(--mono);
+    color:var(--amber);
+    font-size:12px;
+    margin:36px 0 8px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">10 Minutes Before You Walk In</div>
+  <h1>Quick Refresh</h1>
+  <p>One pass, top to bottom, everything condensed to a single line each. Not for learning — for jogging what you already know loose right before you need it.</p>
+</header>
+
+<nav>
+  <a href="#story">Your Story</a>
+  <a href="#patterns">Patterns</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#dotnetspring">.NET / Spring</a>
+  <a href="#angular">Angular</a>
+  <a href="#testing">Testing</a>
+  <a href="#cloud">Cloud</a>
+  <a href="#ai">Agentic AI</a>
+  <a href="#checklist">Final Checklist</a>
+</nav>
+
+<main>
+
+<div class="story-box" id="story">
+  <span class="lbl">Say this first, if you get the opening</span>
+  <p>"I built a production sanctions screening API — architect and reviewer role, AI handled implementation. Weighted multi-algorithm matching (fuzzy, phonetic, Levenshtein) across OFAC SDN, OFAC Non-SDN, and UN watchlists, config-driven so a new source doesn't touch the core engine. I made the design calls, caught the issues, drove the direction."</p>
+</div>
+
+<div class="mini-panel" id="patterns">
+  <h3><span class="n">01</span> Design Patterns & SOLID</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>SRP</b>One reason to change. Watch for "and" in a class description.</div>
+    <div class="chip"><b>OCP</b>Extend without editing tested code.</div>
+    <div class="chip"><b>LSP</b>Subclass must be safely swappable for its base.</div>
+    <div class="chip"><b>ISP</b>Many small interfaces, not one fat one.</div>
+    <div class="chip"><b>DIP</b>Depend on abstractions — this is why DI containers exist.</div>
+    <div class="chip"><b>Strategy</b>My real example: 3 matchers, one interface, weighted combo.</div>
+    <div class="chip"><b>Singleton</b>Usually overused — prefer container-managed AddSingleton.</div>
+    <div class="chip"><b>Factory/Builder</b>Hide construction complexity from the caller.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="architecture">
+  <h3><span class="n">02</span> Architecture</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Microservices</b>Independent deploy/scale per team — skip it below team-scale.</div>
+    <div class="chip"><b>CQRS</b>Split read/write models — doesn't require two databases.</div>
+    <div class="chip"><b>Event-Driven</b>Publish facts, don't call people — idempotency handles duplicates.</div>
+    <div class="chip"><b>Saga</b>Chain of local transactions + explicit compensating "undo" steps.</div>
+    <div class="chip"><b>DDD</b>Business language in code; Bounded Contexts seed microservice boundaries.</div>
+    <div class="chip"><b>Choreography vs Orchestration</b>Orchestrate once steps exceed ~4, for observability.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="dotnetspring">
+  <h3><span class="n">03</span> .NET Core & Spring Java</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>DI lifetime bug</b>Captive dependency — Scoped injected into Singleton gets pinned app-wide.</div>
+    <div class="chip"><b>Spring default scope</b>Singleton by default — opposite instinct from .NET's per-request norm.</div>
+    <div class="chip"><b>Async/await</b>Frees the thread during I/O wait — throughput, not raw speed.</div>
+    <div class="chip"><b>N+1 fix</b>.Include() / JOIN FETCH — eager load instead of looping + lazy load.</div>
+    <div class="chip"><b>Middleware order</b>Exception handler outermost; Auth before Authz.</div>
+    <div class="chip"><b>@Transactional</b>AOP proxy — same idea as wrapping a using-block transaction.</div>
+    <div class="chip"><b>JpaRepository</b>Query generated from method name — no implementation needed.</div>
+    <div class="chip"><b>Minimal APIs</b>Good for small focused services; Controllers scale better for large surfaces.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="angular">
+  <h3><span class="n">04</span> Angular</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>OnPush bug</b>Mutating in place ≠ new reference — reassign, don't mutate.</div>
+    <div class="chip"><b>Signals</b>Explicit dependency tracking — no Zone.js tree-wide check needed.</div>
+    <div class="chip"><b>switchMap</b>Typeahead — cancel stale request on new input.</div>
+    <div class="chip"><b>exhaustMap</b>Ignore new triggers while one's in flight (login button).</div>
+    <div class="chip"><b>concatMap</b>Queue in order, one completes before next starts.</div>
+    <div class="chip"><b>Standalone</b>Same DI/component model, just less NgModule bookkeeping.</div>
+    <div class="chip"><b>State</b>BehaviorSubject for simple, NgRx once cross-team traceability matters.</div>
+    <div class="chip"><b>Memory leak</b>Unsubscribed .subscribe() — use async pipe or takeUntilDestroyed.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="testing">
+  <h3><span class="n">05</span> JUnit & Mockito</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>[Fact] → </b>@Test. [Theory] → @ParameterizedTest.</div>
+    <div class="chip"><b>Moq Setup/Verify → </b>Mockito when(...).thenReturn(...) / verify(...)</div>
+    <div class="chip"><b>@WebMvcTest</b>Loads only the web layer — fast, most tests should live here.</div>
+    <div class="chip"><b>@DataJpaTest</b>Repository layer only, against test DB, auto-rollback.</div>
+    <div class="chip"><b>Testcontainers</b>Real Postgres/Kafka in Docker — closes the "works on H2, fails in prod" gap.</div>
+    <div class="chip"><b>Over-mocking</b>Mock at real seams (external deps), not everything you own.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="cloud">
+  <h3><span class="n">06</span> AWS & Azure</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Horizontal scaling</b>Requires statelessness — externalize session state first.</div>
+    <div class="chip"><b>Lambda / Functions</b>Great for bursty/event work — bad at sustained high throughput (cost) and latency-sensitive work (cold starts).</div>
+    <div class="chip"><b>ALB vs NLB</b>Content-aware routing? ALB (L7). Raw speed/TCP? NLB (L4).</div>
+    <div class="chip"><b>SQS vs SNS</b>One consumer (queue) vs fan-out to all subscribers (topic).</div>
+    <div class="chip"><b>AKS/EKS</b>Managed control plane — skip unless you truly need K8s flexibility.</div>
+    <div class="chip"><b>Service Bus</b>SQS+SNS combined, plus ordered sessions and dedup built in.</div>
+    <div class="chip"><b>APIM</b>Centralize auth/throttling/versioning instead of duplicating per service.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="ai">
+  <h3><span class="n">07</span> Agentic AI / Copilot / MCP</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Agentic vs chatbot</b>Plans, calls tools, observes results, loops — vs single Q&A.</div>
+    <div class="chip"><b>MCP</b>Standard protocol so any AI client calls any tool — N×M → N+M integrations.</div>
+    <div class="chip"><b>Best prompting habit</b>Ask for a plan before code on non-trivial tasks.</div>
+    <div class="chip"><b>Your framing</b>Architect/reviewer — same skill as reviewing a junior dev's PR.</div>
+  </div>
+</div>
+
+<div class="timer-note">If you only remember one thing per section — that's fine, that's the point of this page</div>
+
+<div class="mini-panel" id="checklist">
+  <h3>Final Checklist</h3>
+  <ul class="checklist">
+    <li>Can you say your AI/sanctions-API story in under 30 seconds, calmly, unprompted?</li>
+    <li>One specific trade-off story ready for: Architecture, .NET/Spring, Angular, Cloud</li>
+    <li>Practiced saying "I know X well, on Y my understanding is lighter" out loud at least once</li>
+    <li>2-3 questions ready to ask them about the team/role</li>
+    <li>Phone silent. Water nearby. Deep breath.</li>
+  </ul>
+</div>
+
+</main>
+<footer>QUICK REFRESH · You've done the work — this page is just the reminder. Go.</footer>
+</body>
+</html>
