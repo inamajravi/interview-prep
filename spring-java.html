@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring Java — Mapped from .NET</title>
+<style>
+  :root{
+    --blue-deep:#0B2545;
+    --blue-mid:#123A63;
+    --blue-line:#8ECDDD;
+    --paper:#F4F7FA;
+    --amber:#F2A541;
+    --green:#4CAF88;
+    --slate:#8FA6BE;
+    --red:#E2685A;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --sans: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--blue-deep), var(--blue-deep)),
+      repeating-linear-gradient(0deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px);
+    color:var(--paper);
+    font-family:var(--sans);
+    line-height:1.55;
+    padding:0 0 80px 0;
+  }
+
+  header{
+    padding:48px 24px 32px;
+    max-width:960px;
+    margin:0 auto;
+    border-bottom:1px dashed rgba(142,205,221,0.35);
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    color:var(--amber);
+    letter-spacing:2px;
+    font-size:12px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  h1{
+    font-family:var(--mono);
+    font-size:clamp(28px,5vw,44px);
+    margin:0 0 12px 0;
+    color:var(--paper);
+    letter-spacing:-0.5px;
+  }
+  header p{
+    color:var(--slate);
+    max-width:640px;
+    font-size:15px;
+  }
+  .stamp{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid var(--blue-line);
+    color:var(--blue-line);
+    font-family:var(--mono);
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:2px;
+    margin-top:16px;
+  }
+  .stamp::before{content:"◈"; color:var(--amber);}
+
+  nav{
+    max-width:960px;
+    margin:24px auto 0;
+    padding:0 24px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  nav a{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--blue-line);
+    text-decoration:none;
+    border:1px solid rgba(142,205,221,0.4);
+    padding:7px 12px;
+    border-radius:2px;
+    transition:all .15s ease;
+  }
+  nav a:hover{background:rgba(142,205,221,0.12); border-color:var(--blue-line);}
+
+  main{max-width:960px; margin:0 auto; padding:0 24px;}
+
+  .panel{
+    position:relative;
+    margin:56px 0;
+    border:1px solid rgba(142,205,221,0.4);
+    background:rgba(18,58,99,0.35);
+    border-radius:3px;
+    padding:32px 28px 28px;
+  }
+  .panel::before{
+    content: attr(data-index);
+    position:absolute;
+    top:-14px;
+    left:24px;
+    background:var(--blue-deep);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:2px 10px;
+    border:1px solid var(--amber);
+    border-radius:2px;
+  }
+  .corner{
+    position:absolute;
+    width:14px;height:14px;
+    border-color:var(--blue-line);
+    opacity:0.7;
+  }
+  .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--blue-line);border-left:2px solid var(--blue-line);}
+  .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--blue-line);border-right:2px solid var(--blue-line);}
+
+  .panel h2{
+    font-family:var(--mono);
+    font-size:24px;
+    margin:6px 0 4px;
+    color:var(--paper);
+  }
+  .panel .tagline{
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:13px;
+    margin-bottom:20px;
+  }
+
+  .mapping{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    gap:10px;
+    background:rgba(142,205,221,0.06);
+    border:1px solid rgba(142,205,221,0.25);
+    border-radius:4px;
+    padding:14px 16px;
+    margin:14px 0 20px;
+  }
+  @media(max-width:560px){.mapping{grid-template-columns:1fr; text-align:center;}}
+  .mapping .dotnet, .mapping .spring{font-family:var(--mono); font-size:14px;}
+  .mapping .dotnet{color:var(--blue-line); text-align:right;}
+  .mapping .spring{color:var(--amber); text-align:left;}
+  @media(max-width:560px){.mapping .dotnet, .mapping .spring{text-align:center;}}
+  .mapping .arrow{color:var(--slate); font-family:var(--mono);}
+
+  .analogy{
+    background:rgba(242,165,65,0.08);
+    border-left:3px solid var(--amber);
+    padding:14px 16px;
+    border-radius:0 3px 3px 0;
+    margin:18px 0;
+    font-size:14.5px;
+  }
+  .analogy b{color:var(--amber);}
+
+  .block-title{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--blue-line);
+    margin:22px 0 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .block-title::after{content:""; flex:1; height:1px; background:rgba(142,205,221,0.25);}
+
+  .tradeoff-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin:10px 0;
+  }
+  @media(max-width:640px){.tradeoff-grid{grid-template-columns:1fr;}}
+  .use-box, .avoid-box{
+    padding:12px 14px;
+    border-radius:3px;
+    font-size:14px;
+  }
+  .use-box{background:rgba(76,175,136,0.1); border:1px solid rgba(76,175,136,0.4);}
+  .avoid-box{background:rgba(226,104,90,0.1); border:1px solid rgba(226,104,90,0.4);}
+  .use-box .lbl{color:var(--green);}
+  .avoid-box .lbl{color:var(--red);}
+  .lbl{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:6px;}
+
+  .say-box{
+    margin:20px 0 6px;
+    background:var(--blue-deep);
+    border:1px dashed var(--blue-line);
+    border-radius:3px;
+    padding:16px 18px;
+  }
+  .say-box .lbl{color:var(--blue-line);}
+  .say-box p{margin:8px 0 0; font-style:italic; color:#DCEBF2;}
+
+  details{
+    margin-top:16px;
+    border-top:1px solid rgba(142,205,221,0.2);
+    padding-top:12px;
+  }
+  summary{
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--slate);
+    outline:none;
+  }
+  summary::marker{color:var(--amber);}
+  summary:hover{color:var(--blue-line);}
+  details[open] summary{color:var(--amber); margin-bottom:10px;}
+  details p, details li{font-size:14.5px;}
+  code{
+    font-family:var(--mono);
+    background:rgba(142,205,221,0.12);
+    padding:1px 6px;
+    border-radius:3px;
+    font-size:13px;
+    color:#D7ECF2;
+  }
+  pre{
+    background:#081A30;
+    border:1px solid rgba(142,205,221,0.25);
+    padding:14px;
+    border-radius:4px;
+    overflow-x:auto;
+    font-size:13px;
+  }
+  pre code{background:none; padding:0;}
+
+  .side-by-side{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin:12px 0;
+  }
+  @media(max-width:640px){.side-by-side{grid-template-columns:1fr;}}
+  .code-col{background:#081A30; border:1px solid rgba(142,205,221,0.25); border-radius:4px; padding:12px 14px;}
+  .code-col .lbl{color:var(--slate);}
+
+  .qa{margin-top:8px;}
+  .qa-item{
+    margin:10px 0;
+    padding:12px 14px;
+    background:rgba(255,255,255,0.03);
+    border-radius:3px;
+  }
+  .qa-item .q{font-family:var(--mono); font-size:13px; color:var(--amber); margin-bottom:6px;}
+  .qa-item .a{font-size:14px; color:#DCEBF2;}
+
+  footer{
+    max-width:960px; margin:40px auto 0; padding:24px;
+    color:var(--slate); font-family:var(--mono); font-size:12px;
+    border-top:1px dashed rgba(142,205,221,0.35);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" style="font-family:var(--mono);font-size:12px;color:var(--slate);text-decoration:none;">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 07 / Spring Java</div>
+  <h1>Spring Java — Mapped from .NET</h1>
+  <p>You already know this. Every concept below is something you use daily in .NET — same idea, different keyword. This file is a translation dictionary, not a new language to learn from scratch.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+
+<nav>
+  <a href="#di">01 DI & IoC Container</a>
+  <a href="#webmvc">02 Spring MVC / Web</a>
+  <a href="#data">03 Spring Data JPA</a>
+  <a href="#boot">04 Spring Boot Autoconfig</a>
+  <a href="#aop">05 AOP</a>
+  <a href="#security">06 Spring Security</a>
+  <a href="#config">07 Profiles & Config</a>
+  <a href="#drill">08 Rapid Drill</a>
+</nav>
+
+<main>
+
+<!-- DI -->
+<section class="panel" id="di" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Dependency Injection & the IoC Container</h2>
+  <div class="tagline">Same DI you already do in .NET, different registration syntax</div>
+
+  <div class="mapping">
+    <span class="dotnet">services.AddScoped&lt;IFoo, Foo&gt;()</span>
+    <span class="arrow">↔</span>
+    <span class="spring">@Component / @Service + @Autowired</span>
+  </div>
+
+  <p><b>Define:</b> Spring's <b>ApplicationContext</b> is the IoC container — exactly what .NET's built-in <code>IServiceCollection</code> / <code>IServiceProvider</code> is. You mark a class as a bean with <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, or <code>@Controller</code> (all specializations of <code>@Component</code>, just semantic labels), and Spring wires it into anything that asks for it.</p>
+
+  <div class="analogy"><b>Analogy:</b> Same as .NET — it's the hotel concierge who hands you what you need without you going and building it yourself. The only real difference is how you check in: in .NET you explicitly register at the front desk (<code>Program.cs</code>); in Spring, most rooms self-register just by wearing the right badge (<code>@Component</code>) and being in a scanned package.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>Identical reason to .NET: loose coupling, testability (swap real implementations for mocks), and centralizing object lifecycle instead of scattering <code>new</code> everywhere.</p>
+
+  <div class="block-title">Lifetime mapping</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">.NET</span><code>AddSingleton</code> → one instance app-wide<br><code>AddScoped</code> → one per HTTP request<br><code>AddTransient</code> → new instance every injection</div>
+    <div class="avoid-box"><span class="lbl">Spring</span><code>@Scope("singleton")</code> — default, one per container (not per-request!)<br><code>@Scope("request")</code> → one per HTTP request<br><code>@Scope("prototype")</code> → new instance every injection</div>
+  </div>
+  <p style="font-size:13.5px;color:var(--slate);">⚠ Trap: Spring's default scope is <b>singleton</b>, not scoped-per-request like .NET's most common default. This is the #1 thing that surprises .NET developers moving to Spring — a naive mutable field on a default-scoped bean is shared across every single request.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Constructor injection, bean scopes, the container resolving the dependency graph — conceptually identical to what I do daily in .NET with the built-in DI container. The one thing I'd double check on a real Spring codebase is default bean scope, since it's singleton by default rather than per-request, which changes how you think about thread safety for mutable state."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: constructor vs field injection, @Qualifier</summary>
+    <p><b>Constructor injection</b> (preferred, same as .NET best practice): <code>@Autowired</code> on a constructor, or omit it entirely if there's only one constructor (Spring 4.3+ infers it). Field injection (<code>@Autowired</code> directly on a field) works but is discouraged — same reasoning as .NET: harder to test, hides required dependencies.</p>
+    <p><b>Multiple implementations:</b> .NET's <code>[FromKeyedServices]</code>/named registration maps to Spring's <code>@Qualifier("beanName")</code> to disambiguate which implementation to inject when there's more than one bean of the same interface type.</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: How does Spring know where to scan for @Component classes?</div><div class="a">@ComponentScan (usually implicit via @SpringBootApplication on the main class) scans the package it's in and sub-packages — equivalent to explicitly registering assemblies/types in .NET, just convention-based instead of explicit.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- WEB MVC -->
+<section class="panel" id="webmvc" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Spring MVC / REST Controllers</h2>
+  <div class="tagline">Same controller pattern as ASP.NET Core, different attribute names</div>
+
+  <div class="mapping">
+    <span class="dotnet">[ApiController] [HttpGet("id")]</span>
+    <span class="arrow">↔</span>
+    <span class="spring">@RestController @GetMapping("/id")</span>
+  </div>
+
+  <p><b>Define:</b> <code>@RestController</code> = <code>[ApiController]</code>. <code>@RequestMapping</code>/<code>@GetMapping</code>/<code>@PostMapping</code> = <code>[Route]</code>/<code>[HttpGet]</code>/<code>[HttpPost]</code>. <code>@RequestBody</code> = <code>[FromBody]</code>. <code>@PathVariable</code> = route parameter binding. <code>@RequestParam</code> = <code>[FromQuery]</code>.</p>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">.NET</span>
+      <pre><code>[ApiController]
+[Route("api/[controller]")]
+public class ScreenController {
+  [HttpPost]
+  public IActionResult Screen(
+    [FromBody] ScreenRequest req) {
+    var result = _svc.Match(req);
+    return Ok(result);
+  }
+}</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Spring</span>
+      <pre><code>@RestController
+@RequestMapping("/api/screen")
+public class ScreenController {
+  @PostMapping
+  public ResponseEntity&lt;Result&gt; screen(
+    @RequestBody ScreenRequest req) {
+    var result = svc.match(req);
+    return ResponseEntity.ok(result);
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> Same reception desk, different uniform. The controller's job — receive the request, validate the shape, hand off to a service, return a response — is identical. You're not learning a new job, just a new dress code for the same role.</p>
+
+  <div class="block-title">Trade-off / things that differ</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Validation</span>.NET: Data Annotations + ModelState.<br>Spring: Bean Validation (<code>@Valid</code> + <code>@NotNull</code>/<code>@Size</code> from javax/jakarta.validation) — same idea, JSR-standard annotations instead of Microsoft's.</div>
+    <div class="avoid-box"><span class="lbl">Global error handling</span>.NET: exception-handling middleware.<br>Spring: <code>@ControllerAdvice</code> + <code>@ExceptionHandler</code> — a centralized handler class instead of pipeline middleware, same net effect.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The controller layer in Spring maps almost 1:1 to ASP.NET Core's — annotations instead of attributes, but the same separation of routing, model binding, and delegating to a service layer. The muscle memory transfers; what I'd want to get comfortable with fast is the exact validation and global exception-handling annotations Spring expects."</p>
+  </div>
+</section>
+
+<!-- SPRING DATA -->
+<section class="panel" id="data" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Spring Data JPA</h2>
+  <div class="tagline">Same idea as EF Core, but the repository is auto-generated for you</div>
+
+  <div class="mapping">
+    <span class="dotnet">DbContext + LINQ</span>
+    <span class="arrow">↔</span>
+    <span class="spring">JpaRepository + method names / JPQL</span>
+  </div>
+
+  <p><b>Define:</b> JPA (Hibernate underneath, same relationship as EF Core sitting on top of raw ADO.NET) is Java's ORM standard. Spring Data JPA takes it further than EF Core by letting you define a <b>repository interface</b> with zero implementation — Spring generates the implementation at runtime from the method name itself.</p>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">.NET (EF Core)</span>
+      <pre><code>var user = await _db.Users
+  .FirstOrDefaultAsync(u =>
+    u.Email == email);</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Spring Data JPA</span>
+      <pre><code>public interface UserRepo
+  extends JpaRepository&lt;User, Long&gt; {
+  Optional&lt;User&gt; findByEmail(
+    String email);
+}
+// no implementation needed —
+// Spring writes the query from
+// the method name at runtime</code></pre>
+    </div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> EF Core makes you write the sentence yourself (LINQ). Spring Data JPA is like a very literal assistant who writes the SQL just from reading the method's name out loud — <code>findByEmailAndActiveTrue</code> becomes a real query with zero code behind it, purely by naming convention.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use derived queries when</span>Simple lookups by field(s) — fast to write, self-documenting.</div>
+    <div class="avoid-box"><span class="lbl">Drop to @Query/JPQL when</span>Query gets complex (joins, aggregations) — same judgment call as switching from LINQ method syntax to raw SQL/Dapper in .NET when LINQ gets unreadable.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"It's the same ORM trade-off I already navigate in EF Core — lean on generated queries for simple CRUD, drop to explicit JPQL or native SQL when a query's complexity makes the generated approach unreadable or inefficient. The N+1 query problem is exactly the same failure mode as in EF Core's lazy loading — I'd handle it with JOIN FETCH the same way I'd use .Include() in EF Core."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: N+1 problem, transactions</summary>
+    <p><b>N+1 queries:</b> Just like EF Core lazy-loading a navigation property per row in a loop, JPA lazy-loads associations by default — fetching a list of Orders then accessing <code>order.getCustomer()</code> in a loop fires one query per order. Fix: <code>JOIN FETCH</code> in JPQL, or <code>@EntityGraph</code>, exactly parallel to EF Core's <code>.Include()</code>.</p>
+    <p><b>Transactions:</b> <code>@Transactional</code> on a service method = wrapping a method body in a <code>using var tx = _db.Database.BeginTransaction()</code> in EF Core, but declarative — Spring wraps the method via AOP proxy (see the AOP section below) instead of you writing the using block.</p>
+  </details>
+</section>
+
+<!-- BOOT AUTOCONFIG -->
+<section class="panel" id="boot" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Spring Boot Autoconfiguration</h2>
+  <div class="tagline">Same idea as ASP.NET Core's minimal hosting model, but more "magic" by default</div>
+
+  <p><b>Define:</b> <code>@SpringBootApplication</code> is really three annotations in one: <code>@Configuration</code> (this class can define beans), <code>@ComponentScan</code> (scan for <code>@Component</code>s), and <code>@EnableAutoConfiguration</code> (guess sensible defaults based on what's on the classpath — e.g., see a JPA driver on the classpath, auto-configure a DataSource and EntityManager).</p>
+
+  <div class="analogy"><b>Analogy:</b> .NET's minimal hosting (<code>WebApplication.CreateBuilder</code>) got closer to this over time, but Spring Boot pushes it further — it's like a smart hotel room that notices you packed running shoes and automatically sets up a gym pass, without you asking. Convenient, but you need to know it's happening so you're not surprised by config you never wrote.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Benefit</span>Massive boilerplate reduction — a working REST + JPA app in one file plus one dependency list (starter POMs).</div>
+    <div class="avoid-box"><span class="lbl">Cost</span>"Magic" makes it harder to know exactly what got configured — same criticism .NET devs sometimes level at heavy convention-based frameworks. Debugging autoconfiguration requires <code>--debug</code> flag or the actuator's conditions report.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Autoconfiguration is convention-over-configuration taken further than ASP.NET Core typically goes — it infers a lot from what's on the classpath. I'd want to be comfortable reading the actual configuration report (via the Actuator or debug logging) so 'it just works' doesn't become a black box when something needs to be overridden."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: starter POMs, Actuator</summary>
+    <p><b>Starter POMs:</b> <code>spring-boot-starter-web</code>, <code>spring-boot-starter-data-jpa</code> etc. are curated dependency bundles — roughly the same idea as .NET's meta-packages (e.g. <code>Microsoft.AspNetCore.App</code>), just more granular and per-concern.</p>
+    <p><b>Actuator:</b> maps to .NET's health check middleware + custom diagnostics — exposes <code>/actuator/health</code>, <code>/actuator/metrics</code>, etc. out of the box once you add the dependency.</p>
+  </details>
+</section>
+
+<!-- AOP -->
+<section class="panel" id="aop" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Aspect-Oriented Programming (AOP)</h2>
+  <div class="tagline">Same problem middleware/decorators solve in .NET — cross-cutting concerns without cluttering business code</div>
+
+  <div class="mapping">
+    <span class="dotnet">Middleware / Decorator pattern</span>
+    <span class="arrow">↔</span>
+    <span class="spring">@Aspect + @Around/@Before/@After</span>
+  </div>
+
+  <p><b>Define:</b> AOP lets you inject behavior (logging, security checks, transactions, retries) around method calls without modifying the method itself, by defining an "aspect" that matches a pattern of methods (a "pointcut") and runs code before/after/around them.</p>
+
+  <div class="analogy"><b>Analogy:</b> Same idea as airport security — it doesn't care which specific flight you're on, it applies the same check to <i>everyone passing through a certain gate</i>. An aspect says "anything matching this pattern of methods gets this behavior wrapped around it," without each method needing to know security exists.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>Same motivation as .NET middleware or a decorator wrapping a service: logging, auth checks, caching, and transaction handling are needed across many unrelated methods, and hardcoding them into every method violates single-responsibility and creates repetition.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>A concern is truly cross-cutting (logging, security, transactions, caching) and repeating it manually would clutter every method.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Overused for core business logic — makes control flow hard to trace ("magic" happening outside the method you're reading), same criticism leveled at overusing decorators/middleware for things that should just be explicit code.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"@Transactional is actually the clearest example — it's AOP under the hood, proxying the method to wrap it in a transaction, conceptually the same as middleware wrapping a request pipeline in ASP.NET Core. I'd apply the same discipline I use with middleware: reserve it for genuinely cross-cutting concerns, not business logic."</p>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section class="panel" id="security" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Spring Security</h2>
+  <div class="tagline">Same auth pipeline concepts as ASP.NET Core Identity/JWT middleware, different config style</div>
+
+  <div class="mapping">
+    <span class="dotnet">app.UseAuthentication()/UseAuthorization()</span>
+    <span class="arrow">↔</span>
+    <span class="spring">SecurityFilterChain bean</span>
+  </div>
+
+  <p><b>Define:</b> Spring Security is a chain of servlet filters (conceptually the same as ASP.NET Core middleware pipeline) that intercept every request to authenticate and authorize it before it reaches your controller. You configure it via a <code>SecurityFilterChain</code> bean instead of ordering middleware calls.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Similar</span>JWT validation, role-based (<code>@PreAuthorize("hasRole('ADMIN')")</code> ↔ <code>[Authorize(Roles="Admin")]</code>), OAuth2/OIDC client support built in.</div>
+    <div class="avoid-box"><span class="lbl">Different</span>Historically config-heavy/XML-flavored reputation; modern Spring Security (5+) uses a fluent Java DSL that reads much closer to .NET's fluent middleware config.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Conceptually it's the same filter/middleware chain intercepting requests before they hit a controller, with the same JWT and role-based authorization patterns I already use. The main adjustment is Spring Security's own DSL for wiring the filter chain — the concepts transfer, the exact configuration syntax is what I'd need reps on."</p>
+  </div>
+</section>
+
+<!-- CONFIG -->
+<section class="panel" id="config" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Profiles & Configuration</h2>
+  <div class="tagline">Same as appsettings.{Environment}.json + IOptions&lt;T&gt;</div>
+
+  <div class="mapping">
+    <span class="dotnet">appsettings.Development.json</span>
+    <span class="arrow">↔</span>
+    <span class="spring">application-dev.properties/yml</span>
+  </div>
+
+  <p><b>Define:</b> <code>application.properties</code>/<code>application.yml</code> = <code>appsettings.json</code>. Spring <b>Profiles</b> (<code>@Profile("dev")</code>, activated via <code>spring.profiles.active</code>) = ASP.NET Core's <code>ASPNETCORE_ENVIRONMENT</code>-driven config layering. <code>@ConfigurationProperties</code> = strongly-typed <code>IOptions&lt;T&gt;</code> binding.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Profiles map directly to environment-based config layering in .NET — dev/staging/prod property files instead of appsettings.{Env}.json, and @ConfigurationProperties for strongly-typed binding is the same instinct as IOptions&lt;T&gt;, just YAML/properties instead of JSON."</p>
+  </div>
+</section>
+
+<!-- DRILL -->
+<section class="panel" id="drill" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill — the full mapping table</h2>
+  <div class="tagline">Say the Spring term, then say the .NET equivalent, out loud</div>
+
+  <div class="qa">
+    <div class="qa-item"><div class="q">@Component / @Service / @Repository</div><div class="a">Registering a class in IServiceCollection (services.AddScoped/Singleton/Transient) — semantic sub-types of the same idea as tagging a class for DI.</div></div>
+    <div class="qa-item"><div class="q">@Autowired</div><div class="a">Constructor injection resolved by IServiceProvider — same mechanism, Spring can also do field/setter injection (discouraged, same as in .NET).</div></div>
+    <div class="qa-item"><div class="q">@RestController / @GetMapping</div><div class="a">[ApiController] / [HttpGet] — controller + routing attributes.</div></div>
+    <div class="qa-item"><div class="q">@RequestBody / @PathVariable / @RequestParam</div><div class="a">[FromBody] / route param / [FromQuery].</div></div>
+    <div class="qa-item"><div class="q">JpaRepository&lt;T, ID&gt;</div><div class="a">DbSet&lt;T&gt; + a generic repository, but with auto-generated query methods from naming convention — EF Core doesn't do this part automatically.</div></div>
+    <div class="qa-item"><div class="q">@Transactional</div><div class="a">using var tx = _db.Database.BeginTransaction(), but declarative via AOP proxy instead of explicit code.</div></div>
+    <div class="qa-item"><div class="q">@ControllerAdvice + @ExceptionHandler</div><div class="a">Global exception-handling middleware.</div></div>
+    <div class="qa-item"><div class="q">@Value("${property}")</div><div class="a">IConfiguration["Key"] — single value binding from config.</div></div>
+    <div class="qa-item"><div class="q">@Profile("dev")</div><div class="a">ASPNETCORE_ENVIRONMENT-based appsettings.{Env}.json layering.</div></div>
+    <div class="qa-item"><div class="q">Bean scope: singleton (default) / prototype / request</div><div class="a">AddSingleton / AddTransient / AddScoped — same three lifetimes, different default (Spring defaults to singleton, .NET has no single default — you must choose).</div></div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">If you don't know an angle</span>
+    <p>"The concepts map cleanly from .NET — DI, MVC, an ORM, middleware-equivalent filters. Where my hands-on Spring time is lighter is [specific: e.g. exact Spring Security DSL syntax, or Spring Cloud for microservices], so I'd want to get reps in on the syntax rather than claim production depth I don't have yet."</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  BLUEPRINT 07 — SPRING JAVA (MAPPED FROM .NET) · Interview Prep Series · Next: AWS, Azure, Mock Drill
+</footer>
+
+</body>
+</html>

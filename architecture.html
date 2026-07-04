@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture — Interview Blueprint</title>
+<style>
+  :root{
+    --blue-deep:#0B2545;
+    --blue-mid:#123A63;
+    --blue-line:#8ECDDD;
+    --paper:#F4F7FA;
+    --amber:#F2A541;
+    --green:#4CAF88;
+    --slate:#8FA6BE;
+    --red:#E2685A;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --sans: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--blue-deep), var(--blue-deep)) ,
+      repeating-linear-gradient(0deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px);
+    color:var(--paper);
+    font-family:var(--sans);
+    line-height:1.55;
+    padding:0 0 80px 0;
+  }
+
+  header{
+    padding:48px 24px 32px;
+    max-width:960px;
+    margin:0 auto;
+    border-bottom:1px dashed rgba(142,205,221,0.35);
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    color:var(--amber);
+    letter-spacing:2px;
+    font-size:12px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  h1{
+    font-family:var(--mono);
+    font-size:clamp(28px,5vw,44px);
+    margin:0 0 12px 0;
+    color:var(--paper);
+    letter-spacing:-0.5px;
+  }
+  header p{
+    color:var(--slate);
+    max-width:640px;
+    font-size:15px;
+  }
+  .stamp{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid var(--blue-line);
+    color:var(--blue-line);
+    font-family:var(--mono);
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:2px;
+    margin-top:16px;
+  }
+  .stamp::before{content:"◈"; color:var(--amber);}
+
+  nav{
+    max-width:960px;
+    margin:24px auto 0;
+    padding:0 24px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  nav a{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--blue-line);
+    text-decoration:none;
+    border:1px solid rgba(142,205,221,0.4);
+    padding:7px 12px;
+    border-radius:2px;
+    transition:all .15s ease;
+  }
+  nav a:hover{background:rgba(142,205,221,0.12); border-color:var(--blue-line);}
+
+  main{max-width:960px; margin:0 auto; padding:0 24px;}
+
+  .panel{
+    position:relative;
+    margin:56px 0;
+    border:1px solid rgba(142,205,221,0.4);
+    background:rgba(18,58,99,0.35);
+    border-radius:3px;
+    padding:32px 28px 28px;
+  }
+  .panel::before{
+    content: attr(data-index);
+    position:absolute;
+    top:-14px;
+    left:24px;
+    background:var(--blue-deep);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:2px 10px;
+    border:1px solid var(--amber);
+    border-radius:2px;
+  }
+  .corner{
+    position:absolute;
+    width:14px;height:14px;
+    border-color:var(--blue-line);
+    opacity:0.7;
+  }
+  .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--blue-line);border-left:2px solid var(--blue-line);}
+  .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--blue-line);border-right:2px solid var(--blue-line);}
+
+  .panel h2{
+    font-family:var(--mono);
+    font-size:24px;
+    margin:6px 0 4px;
+    color:var(--paper);
+  }
+  .panel .tagline{
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:13px;
+    margin-bottom:20px;
+  }
+
+  .analogy{
+    background:rgba(242,165,65,0.08);
+    border-left:3px solid var(--amber);
+    padding:14px 16px;
+    border-radius:0 3px 3px 0;
+    margin:18px 0;
+    font-size:14.5px;
+  }
+  .analogy b{color:var(--amber);}
+
+  .block-title{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--blue-line);
+    margin:22px 0 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .block-title::after{content:""; flex:1; height:1px; background:rgba(142,205,221,0.25);}
+
+  .tradeoff-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin:10px 0;
+  }
+  @media(max-width:640px){.tradeoff-grid{grid-template-columns:1fr;}}
+  .use-box, .avoid-box{
+    padding:12px 14px;
+    border-radius:3px;
+    font-size:14px;
+  }
+  .use-box{background:rgba(76,175,136,0.1); border:1px solid rgba(76,175,136,0.4);}
+  .avoid-box{background:rgba(226,104,90,0.1); border:1px solid rgba(226,104,90,0.4);}
+  .use-box .lbl{color:var(--green);}
+  .avoid-box .lbl{color:var(--red);}
+  .lbl{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:6px;}
+
+  .say-box{
+    margin:20px 0 6px;
+    background:var(--blue-deep);
+    border:1px dashed var(--blue-line);
+    border-radius:3px;
+    padding:16px 18px;
+  }
+  .say-box .lbl{color:var(--blue-line);}
+  .say-box p{margin:8px 0 0; font-style:italic; color:#DCEBF2;}
+
+  details{
+    margin-top:16px;
+    border-top:1px solid rgba(142,205,221,0.2);
+    padding-top:12px;
+  }
+  summary{
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--slate);
+    outline:none;
+  }
+  summary::marker{color:var(--amber);}
+  summary:hover{color:var(--blue-line);}
+  details[open] summary{color:var(--amber); margin-bottom:10px;}
+  details p, details li{font-size:14.5px;}
+  code{
+    font-family:var(--mono);
+    background:rgba(142,205,221,0.12);
+    padding:1px 6px;
+    border-radius:3px;
+    font-size:13px;
+    color:#D7ECF2;
+  }
+  pre{
+    background:#081A30;
+    border:1px solid rgba(142,205,221,0.25);
+    padding:14px;
+    border-radius:4px;
+    overflow-x:auto;
+    font-size:13px;
+  }
+  pre code{background:none; padding:0;}
+
+  .qa{
+    margin-top:8px;
+  }
+  .qa-item{
+    margin:10px 0;
+    padding:12px 14px;
+    background:rgba(255,255,255,0.03);
+    border-radius:3px;
+  }
+  .qa-item .q{font-family:var(--mono); font-size:13px; color:var(--amber); margin-bottom:6px;}
+  .qa-item .a{font-size:14px; color:#DCEBF2;}
+
+  footer{
+    max-width:960px; margin:40px auto 0; padding:24px;
+    color:var(--slate); font-family:var(--mono); font-size:12px;
+    border-top:1px dashed rgba(142,205,221,0.35);
+  }
+
+  .toc-title{font-family:var(--mono); color:var(--slate); font-size:12px; margin:0 0 4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" style="font-family:var(--mono);font-size:12px;color:var(--slate);text-decoration:none;">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 06 / Architecture</div>
+  <h1>System Architecture</h1>
+  <p>Microservices, CQRS, Event-Driven Design, Saga, and DDD — framed the way you'll actually need to say them out loud, in an interview, under pressure.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+
+<nav>
+  <a href="#microservices">01 Microservices</a>
+  <a href="#cqrs">02 CQRS</a>
+  <a href="#eventdriven">03 Event-Driven</a>
+  <a href="#saga">04 Saga Pattern</a>
+  <a href="#ddd">05 Domain-Driven Design</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+
+<main>
+
+<!-- MICROSERVICES -->
+<section class="panel" id="microservices" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Microservices Architecture</h2>
+  <div class="tagline">Small, independently deployable services, each owning one piece of the business</div>
+
+  <p><b>Define:</b> An application built as a set of small, independently deployable services, each with its own database, each responsible for one business capability, talking to each other over the network (usually HTTP/REST or messaging).</p>
+
+  <div class="analogy"><b>Analogy:</b> Think of a restaurant. A monolith is one chef doing everything — chopping, grilling, plating, billing — in one kitchen. If the grill breaks, the whole kitchen stops. Microservices is a restaurant with separate stations: a grill station, a salad station, a billing counter. Each has its own tools and staff. If the salad station has a bad day, the grill still serves steaks.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>Monoliths become painful at scale: one team's bug can take down the whole app, one slow module blocks the whole deployment pipeline, and you can't scale just the "hot" part of the app independently. Microservices let teams deploy independently, scale independently, and pick the right tech per service.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions screening API I built, <code>/screen</code>, <code>/forecast</code>, and <code>/explain</code> were designed as logically separate concerns behind one FastAPI app — a natural next step would be splitting <code>/forecast</code> (heavier, ML-style workload) into its own service so it can scale independently of the lightweight <code>/screen</code> lookups, without touching the matching engine's deploy cycle.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Teams need to deploy independently; different parts of the system have very different scaling needs; the domain has clear bounded contexts.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Small team, small domain, early-stage product — you'll pay a distributed-systems tax (network calls, data consistency, deployment complexity) before you need the benefit.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Microservices solve an organizational scaling problem as much as a technical one — they let teams ship independently. I've worked in a modular monolith with clear service boundaries; the honest trade-off is you're trading deployment simplicity for team autonomy, and that trade only pays off once you actually have multiple teams stepping on each other."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: how services actually talk, and what breaks</summary>
+    <p><b>Communication:</b> Synchronous (REST/gRPC) for request-response needs; asynchronous (message queue/event bus) when the caller doesn't need to wait. Mixing both is normal — sync for reads, async for side-effects like notifications.</p>
+    <p><b>What breaks first:</b> Distributed data consistency (no more single DB transaction across services), debugging (a request now spans 5 logs, so you need distributed tracing — correlation IDs, tools like OpenTelemetry/Jaeger), and network reliability (services must handle timeouts, retries, circuit breakers — e.g. Polly in .NET).</p>
+    <p><b>Service boundaries:</b> The #1 mistake is drawing boundaries around technical layers (a "database service", a "validation service") instead of business capabilities (Order service, Inventory service). Wrong boundaries cause chatty inter-service calls — a smell interviewers listen for.</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: How do you handle a transaction that spans two services?</div><div class="a">You generally don't use a distributed transaction (2PC is heavy and fragile). Instead use the Saga pattern — a sequence of local transactions with compensating actions if a later step fails.</div></div>
+      <div class="qa-item"><div class="q">Q: How do services find each other?</div><div class="a">Service discovery (e.g. Consul, Kubernetes DNS/service objects) or an API gateway that routes based on path/host, so callers don't hardcode IPs.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- CQRS -->
+<section class="panel" id="cqrs" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>CQRS</h2>
+  <div class="tagline">Command Query Responsibility Segregation — split how you write from how you read</div>
+
+  <p><b>Define:</b> Separate the model (and often the data path) used to update data (Commands) from the model used to read data (Queries). Writes go through a model optimized for business rules and consistency; reads go through a model optimized for the shape the UI actually needs.</p>
+
+  <div class="analogy"><b>Analogy:</b> A restaurant kitchen (writes) is optimized for correctly preparing food — order, checks, steps, quality control. The menu board (reads) is optimized for a customer glancing at it and deciding fast. You wouldn't force the customer to read the kitchen's ticket system, and you wouldn't run the kitchen off the menu board. Same underlying business (food), two very different shapes of "view" into it.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>In many real systems, reads vastly outnumber writes, and the ideal shape for a write (normalized, validated, consistent) is completely different from the ideal shape for a read (denormalized, fast, sometimes eventually-consistent). One model trying to serve both ends up compromised for both.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions API, the "write side" is how a new watchlist gets ingested and normalized across OFAC SDN, OFAC Non-SDN, and UN sources into a consistent internal shape. The "read side" is <code>/screen</code> — a fast lookup path that doesn't care about ingestion rules at all, only about matching speed. I didn't formally implement CQRS with separate stores, but the conceptual split — ingestion/normalization logic vs. lookup/matching logic — is exactly the same idea, and it's the natural next step if read volume ever needs its own scaled, denormalized index.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Read and write workloads have very different volume or shape needs; complex domain logic on writes but simple, high-volume reads (dashboards, search).</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Simple CRUD app — CQRS adds real complexity (often two models, sometimes two data stores, possible eventual consistency) that isn't justified without a real read/write asymmetry.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"CQRS isn't 'always use two databases' — at its simplest it's just two different models: one shaped for enforcing business rules on write, one shaped for fast, denormalized reads. I've applied the concept even without full event sourcing — separating my ingestion/validation logic from my lookup logic — because coupling them was making both harder to change."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: CQRS + Event Sourcing, and eventual consistency</summary>
+    <p>CQRS is often paired with <b>Event Sourcing</b>, where instead of storing current state, you store the sequence of events that led to it (like a bank ledger, not just a balance). The read model is then a "projection" rebuilt from events. This isn't required for CQRS, but they combine well because events naturally feed the read-side projections.</p>
+    <p><b>Eventual consistency risk:</b> If read and write use separate stores, there's a lag — a user might write data and not immediately see it on the read side. You must decide if that's acceptable for the use case (analytics dashboard: yes; account balance: usually no, or you need read-your-writes tricks).</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: Does CQRS require two databases?</div><div class="a">No. You can implement CQRS with one database and just two different model/query paths. Two databases is an optimization you add only when the read/write scaling needs actually diverge.</div></div>
+      <div class="qa-item"><div class="q">Q: What's the biggest real-world risk with CQRS?</div><div class="a">Over-engineering — teams adopt it for apps with no meaningful read/write asymmetry and pay the complexity cost for nothing.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- EVENT DRIVEN -->
+<section class="panel" id="eventdriven" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Event-Driven Architecture</h2>
+  <div class="tagline">Services react to things that happened, instead of being told what to do</div>
+
+  <p><b>Define:</b> Instead of Service A directly calling Service B, Service A publishes an event ("OrderPlaced") to a broker (Kafka, RabbitMQ, SNS/SQS, Azure Service Bus). Any service that cares subscribes and reacts. The publisher doesn't know or care who's listening.</p>
+
+  <div class="analogy"><b>Analogy:</b> A notice board in an office versus phoning every single person individually. When something happens (a policy change), you pin one notice. HR reads it, Finance reads it, Facilities reads it — each acts in their own way, on their own time. You didn't have to know in advance who'd care, and adding a new department later doesn't mean changing your announcement process.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>Direct service-to-service calls create tight coupling — Service A must know about B, C, and D, and if any is slow or down, A is affected. Events decouple producers from consumers: producers don't know who's listening, and new consumers can be added without touching the producer at all.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the architect/reviewer role on the sanctions API, when a match is found by <code>/screen</code>, the natural extension is publishing a "SanctionsMatchFound" event rather than the screening service directly calling a notification service, a case-management service, and an audit-log service synchronously. Each of those becomes an independent subscriber — I can add an audit consumer later without redeploying the screening engine at all.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Multiple downstream systems need to react to the same fact; you want producers and consumers to evolve independently; workflows are naturally asynchronous.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>You need an immediate response/result back (checkout confirmation to a user) — pure fire-and-forget events make that awkward; also adds operational overhead (a broker to run, monitor, and reason about).</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Event-driven design trades immediate consistency and simple call-stacks for loose coupling and independent scalability. The failure mode I watch for is 'event soup' — so many events flying around that no one can trace a business process end-to-end without distributed tracing and good event schemas."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: choreography vs orchestration, at-least-once delivery</summary>
+    <p><b>Choreography</b>: each service reacts to events independently, no central coordinator — highly decoupled but hard to see the "big picture" of a business process. <b>Orchestration</b>: a central coordinator (e.g. a Saga orchestrator) tells each service what to do next — easier to reason about and monitor, but reintroduces a central point of coupling.</p>
+    <p><b>Delivery guarantees:</b> Most brokers give "at-least-once" delivery, meaning a consumer might see the same event twice. Your handlers must be <b>idempotent</b> — processing the same "OrderPlaced" event twice should not double-charge or double-ship.</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: How do you prevent duplicate event processing?</div><div class="a">Idempotency keys — track a unique event/message ID and skip processing if you've already handled it, typically via a dedupe table or the message ID unique constraint.</div></div>
+      <div class="qa-item"><div class="q">Q: SNS/SQS vs Kafka — when which?</div><div class="a">SQS/SNS: simple pub/sub and queueing, fully managed, great for decoupled microservices at moderate throughput. Kafka: when you need replayable event logs, very high throughput, or multiple consumer groups reading the same stream independently at their own pace.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- SAGA -->
+<section class="panel" id="saga" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Saga Pattern</h2>
+  <div class="tagline">A distributed transaction, done as a chain of local transactions with an "undo" plan</div>
+
+  <p><b>Define:</b> A sequence of local transactions across multiple services, where each step publishes an event/triggers the next step. If a step fails partway through, previously completed steps are undone using <b>compensating transactions</b> (not a database rollback — an explicit "reverse" action).</p>
+
+  <div class="analogy"><b>Analogy:</b> Booking a trip: reserve a flight, then a hotel, then a rental car. There's no single "transaction" spanning three different companies' systems. If the car rental fails, you don't get a magic rollback — you explicitly cancel the flight and the hotel. That explicit cancel-if-later-step-fails is exactly what a Saga's compensating transaction is.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>In a monolith with one database, a failed step just rolls back the whole ACID transaction. Across microservices with separate databases, there's no shared transaction to roll back. Saga is how you get "all-or-nothing" behavior back, without a fragile distributed transaction (2PC) that locks resources across services.</p>
+
+  <div class="block-title">My real example</div>
+  <p>I'd frame this from the domain even without having built a full Saga: if screening (<code>/screen</code>), case creation, and notification were three separate services, and case creation failed after a match was already logged, a Saga-style design would fire a compensating "MatchLogReverted" step rather than leaving an orphaned record — I'd flag this explicitly as an architectural improvement I'd propose, not a "did it exactly" claim.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>A business process spans multiple services/databases and needs all-or-nothing semantics without a distributed transaction.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Everything lives in one database (just use a normal ACID transaction) — Saga adds real design complexity (you must design a compensating action for every step) that's wasted if you don't actually have the distributed problem.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Saga gives you eventual atomicity, not immediate atomicity — there's a window where the system is in an intermediate state. The hard part isn't the happy path, it's designing a correct compensating action for every single step, including ones that can't be perfectly undone, like 'email already sent.'"</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: choreography-based vs orchestration-based Saga</summary>
+    <p><b>Choreography Saga:</b> each service listens for the previous service's event and emits its own — fully decoupled, but hard to track overall progress and easy to create circular dependencies.</p>
+    <p><b>Orchestration Saga:</b> a central Saga orchestrator explicitly calls each service and decides what happens on failure — easier to monitor and reason about as one workflow, at the cost of that orchestrator becoming a critical, coupled component.</p>
+    <p>Most real production systems favor orchestration once the number of steps exceeds 3-4, purely for observability and debuggability.</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: What if a compensating action itself fails?</div><div class="a">You need retries with backoff, and ultimately a manual intervention/dead-letter queue path — some things genuinely can't be perfectly undone (a sent email, a physical shipment), so the design must acknowledge that upfront rather than pretend perfect rollback is possible.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- DDD -->
+<section class="panel" id="ddd" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Domain-Driven Design</h2>
+  <div class="tagline">Model the software around the real business, using the business's own language</div>
+
+  <p><b>Define:</b> An approach where you structure code around the business domain rather than around technical layers, using a <b>Ubiquitous Language</b> (the exact terms the business uses) and dividing large domains into <b>Bounded Contexts</b> — explicit boundaries where a term means one specific thing.</p>
+
+  <div class="analogy"><b>Analogy:</b> The word "Customer" means something different to Sales (a lead with a budget) and to Support (someone with an active ticket history). DDD says: don't force one giant "Customer" class to serve both meanings. Give Sales its own bounded context with its own "Customer" model, and Support its own — and be explicit about how the two map to each other at the boundary, the same way two countries agree on a currency exchange rate rather than sharing one currency.</p>
+
+  <div class="block-title">Why it exists</div>
+  <p>Large systems built purely around technical layers (controllers, services, repositories) tend to lose the business meaning — the code stops mapping to how the business actually thinks, and every change requires a translation exercise between "what the business asked for" and "which layer does that touch." DDD keeps code and business language in sync, and gives natural seams for microservice boundaries.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions API, "Match" isn't just a data row — it has real domain meaning: a weighted composite of fuzzy, phonetic, and Levenshtein scores, tied to a specific watchlist source (OFAC SDN, OFAC Non-SDN, UN) with its own matching rules. Treating "match against OFAC SDN" and "match against UN list" as the same generic concept would have hidden real business differences — so the config-driven, per-list architecture was effectively a DDD instinct: keep the domain rules explicit and separated by source, not flattened into one generic matcher.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Complex business domain with real rules and nuance (finance, compliance, insurance, logistics) where getting the model wrong causes real bugs.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>Simple CRUD/data-entry apps with no real business logic — the ceremony (aggregates, bounded contexts, ubiquitous language workshops) is overhead you don't need.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"DDD's real value for me isn't the tactical patterns like Aggregates and Value Objects — it's the discipline of using the business's actual language in the code, and being deliberate about where one term's meaning ends and another begins. That's what naturally gives you good microservice boundaries later."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: Aggregates, Value Objects, Bounded Context mapping</summary>
+    <p><b>Aggregate:</b> a cluster of objects treated as one consistency unit, with one "root" entity controlling access (e.g. an Order aggregate containing OrderLines — you never modify an OrderLine directly, always through the Order).</p>
+    <p><b>Value Object:</b> an object defined entirely by its data, with no identity — a Money(amount, currency) or an Address is equal to another with the same values, unlike an Entity which has identity even if its data changes.</p>
+    <p><b>Context Mapping:</b> when two bounded contexts need to talk, you define the relationship explicitly — e.g. an Anti-Corruption Layer that translates one context's model into another's, so a change on one side doesn't silently corrupt the other's meaning of a term.</p>
+    <div class="qa">
+      <div class="qa-item"><div class="q">Q: How does DDD relate to microservices?</div><div class="a">Bounded Contexts are a strong candidate for microservice boundaries — each bounded context can become its own service, since it already has its own model and language, minimizing cross-service chatter.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- DRILL -->
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="tagline">Cover the term, say the one-liner out loud, then check</div>
+
+  <div class="qa">
+    <div class="qa-item"><div class="q">Microservices — one line</div><div class="a">Independently deployable services per business capability, so teams can ship and scale on their own timeline — at the cost of distributed-systems complexity.</div></div>
+    <div class="qa-item"><div class="q">CQRS — one line</div><div class="a">Split the write model from the read model because their ideal shapes are different — not "always two databases."</div></div>
+    <div class="qa-item"><div class="q">Event-Driven — one line</div><div class="a">Publish facts, don't call people — decouples producers from consumers, at the cost of harder end-to-end tracing.</div></div>
+    <div class="qa-item"><div class="q">Saga — one line</div><div class="a">A chain of local transactions with explicit compensating "undo" steps, because there's no shared database transaction across services.</div></div>
+    <div class="qa-item"><div class="q">DDD — one line</div><div class="a">Model the code in the business's own language, with explicit boundaries where a term's meaning changes — the natural seed for good microservice boundaries.</div></div>
+  </div>
+  <div class="say-box">
+    <span class="lbl">If you don't know an angle</span>
+    <p>"I know the core mechanics of [X] well — where my hands-on experience is lighter is [specific sub-area], so I'd want to validate that against your actual setup rather than guess."</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  BLUEPRINT 06 — ARCHITECTURE · Interview Prep Series · Next: Spring Java, AWS, Azure, Mock Drill
+</footer>
+
+</body>
+</html>
