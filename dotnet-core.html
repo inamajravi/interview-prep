@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>.NET Core — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 02 / .NET Core</div>
+  <h1>.NET Core Internals</h1>
+  <p>DI lifecycle, middleware pipeline, async/await internals, EF Core, Minimal APIs — the mechanics behind the framework you use daily, explained the way you'd need to defend them under questioning.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#di">01 DI Lifetimes</a>
+  <a href="#middleware">02 Middleware Pipeline</a>
+  <a href="#async">03 Async/Await Internals</a>
+  <a href="#efcore">04 EF Core</a>
+  <a href="#minimal">05 Minimal APIs</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="di" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>DI Lifetimes</h2>
+  <div class="tagline">Singleton, Scoped, Transient — and the bug each one causes when misused</div>
+
+  <p><b>Define:</b> Three lifetimes control how long the container keeps an instance alive: <b>Singleton</b> (one instance, app lifetime), <b>Scoped</b> (one instance per HTTP request), <b>Transient</b> (new instance every time it's injected).</p>
+
+  <div class="analogy"><b>Analogy:</b> Singleton is the office's shared printer — everyone uses the same one. Scoped is a meeting room booked for one meeting — fresh per meeting, shared by everyone inside that meeting. Transient is a disposable coffee cup — brand new every single time, never shared.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Not everything should be shared (a DbContext per-request avoids cross-request data leaking), and not everything should be recreated constantly (an expensive-to-build config object should live for the app's whole life). Lifetimes let you match object lifespan to its actual use.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions API, the loaded watchlist data (OFAC/UN lists) is effectively singleton-scoped — expensive to parse, safe to share read-only across requests. The per-request screening context (which name is being checked, which thresholds apply) is scoped — fresh per screening call, never bleeding into the next request.</p>
+
+  <div class="block-title">Trade-off — the classic bug</div>
+  <div class="tradeoff-grid">
+    <div class="avoid-box"><span class="lbl">Captive dependency</span>Injecting a Scoped service into a Singleton captures that scoped instance for the app's entire lifetime — silently breaking per-request isolation. This is the single most common DI interview trap question.</div>
+    <div class="use-box"><span class="lbl">Fix</span>Never inject Scoped/Transient into Singleton directly — inject <code>IServiceScopeFactory</code> and create a scope manually when the Singleton needs scoped work done.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The lifetime bug I watch for most is a captive dependency — a Scoped service accidentally getting pinned to Singleton lifetime because it was injected into one. I always check the lifetime of everything a Singleton depends on, not just the Singleton itself."</p>
+  </div>
+</section>
+
+<section class="panel" id="middleware" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Middleware Pipeline</h2>
+  <div class="tagline">Chain of Responsibility, applied to every HTTP request</div>
+
+  <p><b>Define:</b> Each request flows through an ordered chain of middleware components, each able to inspect/modify the request, call the next middleware, and inspect/modify the response on the way back out.</p>
+
+  <div class="analogy"><b>Analogy:</b> Airport security checkpoints — ID check, bag scan, metal detector, boarding gate — each in a fixed order, each able to stop you from proceeding, and you pass back through some of them (in reverse) on the way out.</div>
+
+  <div class="block-title">Why order matters</div>
+  <p>Middleware order is not cosmetic — it's the whole design. <code>UseExceptionHandler</code> must be first (to catch everything downstream), <code>UseAuthentication</code> must come before <code>UseAuthorization</code> (you can't authorize an unauthenticated user), and <code>UseRouting</code> must come before endpoint-specific middleware that needs route data.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the FastAPI sanctions project the same shape exists via dependency injection + middleware-equivalent hooks — request validation happens before the matching engine ever runs, and error handling wraps the whole call so a malformed name doesn't crash the process, it returns a clean 400.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use middleware for</span>Cross-cutting concerns: logging, auth, exception handling, CORS, response compression.</div>
+    <div class="avoid-box"><span class="lbl">Don't put in middleware</span>Business logic — middleware should never know about your domain (e.g. "is this a valid sanctions match"); that belongs in a service, not the pipeline.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Middleware order is the interview trap — I always reason about it as a Chain of Responsibility, and the two orderings I double check every time are exception handling being outermost, and authentication strictly before authorization."</p>
+  </div>
+</section>
+
+<section class="panel" id="async" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Async/Await Internals</h2>
+  <div class="tagline">It's not multithreading — it's not blocking a thread while waiting</div>
+
+  <p><b>Define:</b> <code>async</code>/<code>await</code> lets a thread be released back to the thread pool while an I/O operation (DB call, HTTP call, file read) is in flight, instead of blocking that thread doing nothing. When the I/O completes, a thread (not necessarily the same one) resumes the method from where it left off.</p>
+
+  <div class="analogy"><b>Analogy:</b> A waiter at a restaurant doesn't stand at your table staring at the kitchen while your food cooks — they take other tables' orders and come back when your food's ready. The waiter is the thread; standing idle for 20 minutes would be a blocking call; serving other tables in the meantime is async.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Without async, a web server handling 1,000 concurrent slow DB calls would need 1,000 blocked threads sitting idle — expensive and doesn't scale. Async lets a small thread pool serve thousands of concurrent I/O-bound requests, since threads are freed during the wait.</p>
+
+  <div class="block-title">Trade-off / common trap</div>
+  <div class="tradeoff-grid">
+    <div class="avoid-box"><span class="lbl">async void</span>Never use except for event handlers — exceptions in an async void method can't be caught by the caller and will crash the process.</div>
+    <div class="avoid-box"><span class="lbl">Sync-over-async</span>Calling <code>.Result</code> or <code>.Wait()</code> on a Task can deadlock in contexts with a SynchronizationContext (classic ASP.NET, some UI apps) — always await all the way up.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Async/await is about thread efficiency for I/O-bound work, not parallelism — it doesn't make a single operation faster, it lets one thread serve many concurrent waiting operations. The bug I'm most careful about is sync-over-async — calling .Result on a Task — because it can deadlock in the wrong context."</p>
+  </div>
+
+  <details>
+    <summary>▸ Deep dive: what the compiler actually generates</summary>
+    <p>An <code>async</code> method compiles into a state machine — each <code>await</code> is a point where execution can suspend and later resume, implemented via a generated class implementing <code>IAsyncStateMachine</code>. <code>ConfigureAwait(false)</code> tells the continuation it doesn't need to resume on the original context (e.g. UI thread) — a common library-code optimization to avoid unnecessary context switches.</p>
+  </details>
+</section>
+
+<section class="panel" id="efcore" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>EF Core</h2>
+  <div class="tagline">Change tracking, and the two bugs that account for most EF Core interview questions</div>
+
+  <p><b>Define:</b> EF Core is an ORM — <code>DbContext</code> tracks entity state (Added/Modified/Deleted/Unchanged) and translates LINQ into SQL, generating the right INSERT/UPDATE/DELETE on <code>SaveChanges()</code>.</p>
+
+  <div class="block-title">The N+1 problem</div>
+  <p>Looping over a list and accessing a lazy-loaded navigation property per iteration fires one query per row instead of one query total. <b>Fix:</b> <code>.Include()</code> for eager loading, or explicit projection with <code>.Select()</code> to only pull needed columns.</p>
+
+  <div class="block-title">Tracking vs No-Tracking</div>
+  <p>By default EF Core tracks every entity it loads (to detect changes for SaveChanges) — for read-only queries (like a screening lookup that never modifies data), <code>.AsNoTracking()</code> avoids the tracking overhead entirely and is a real, measurable performance win on hot read paths.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use EF Core when</span>Standard CRUD, rapid development, and the abstraction's overhead is acceptable.</div>
+    <div class="avoid-box"><span class="lbl">Drop to Dapper/raw SQL when</span>A query is performance-critical and EF's generated SQL is inefficient — you don't need to abandon EF app-wide, just for that hot path.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The two EF Core habits I always apply: AsNoTracking on read-only paths, and watching for N+1 by checking generated SQL (via logging) whenever a loop touches a navigation property. Most EF Core performance issues I've seen trace back to one of those two."</p>
+  </div>
+</section>
+
+<section class="panel" id="minimal" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Minimal APIs</h2>
+  <div class="tagline">Same HTTP pipeline, far less ceremony for small, focused services</div>
+
+  <p><b>Define:</b> Define endpoints directly (<code>app.MapGet("/screen", handler)</code>) without a full Controller class — same routing/DI/middleware pipeline underneath, just less boilerplate.</p>
+
+  <div class="analogy"><b>Analogy:</b> Controllers are a formal restaurant with a fixed menu structure (starters, mains, desserts as separate classes). Minimal APIs are a food truck — same food, same kitchen, far less ceremony to order.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use for</span>Microservices with a small number of focused endpoints, or when you want the leanest possible startup/footprint.</div>
+    <div class="avoid-box"><span class="lbl">Avoid for</span>Large APIs with many endpoints — Controllers' organization (grouping by resource, filters, model binding conventions) scales better for big surface areas.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Minimal APIs are a good fit for small, focused microservices where the ceremony of full MVC controllers isn't earning its keep — but for a large API surface, I'd still reach for Controllers because the organizational conventions pay off at scale."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What breaks if you inject a Scoped service into a Singleton?</div><div class="a">Captive dependency — the scoped instance gets pinned to the singleton's lifetime, silently breaking per-request isolation.</div></div>
+    <div class="qa-item"><div class="q">Why does async/await help throughput?</div><div class="a">It frees the thread during I/O wait instead of blocking it, so a small thread pool can serve many concurrent I/O-bound requests.</div></div>
+    <div class="qa-item"><div class="q">Fastest fix for N+1 in EF Core?</div><div class="a">.Include() for eager loading, or restructure the query to project only what's needed instead of looping and lazy-loading.</div></div>
+    <div class="qa-item"><div class="q">Why AsNoTracking on reads?</div><div class="a">Skips EF's change-tracking overhead for entities you'll never modify — real performance win on read-heavy paths.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 02 — .NET CORE · Interview Prep Series</footer>
+</body>
+</html>
