@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech Lead Interview Prep — Hub</title>
+<style>
+  :root{
+    --blue-deep:#0B2545;
+    --blue-line:#8ECDDD;
+    --paper:#F4F7FA;
+    --amber:#F2A541;
+    --green:#4CAF88;
+    --slate:#8FA6BE;
+    --red:#E2685A;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --sans: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--blue-deep), var(--blue-deep)),
+      repeating-linear-gradient(0deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, rgba(142,205,221,0.06) 0px, rgba(142,205,221,0.06) 1px, transparent 1px, transparent 32px);
+    color:var(--paper);
+    font-family:var(--sans);
+    line-height:1.55;
+    min-height:100vh;
+    padding-bottom:80px;
+  }
+  header{
+    max-width:960px; margin:0 auto; padding:56px 24px 32px;
+    border-bottom:1px dashed rgba(142,205,221,0.35);
+  }
+  .eyebrow{font-family:var(--mono); color:var(--amber); letter-spacing:2px; font-size:12px; text-transform:uppercase; margin-bottom:10px;}
+  h1{font-family:var(--mono); font-size:clamp(30px,5.5vw,48px); margin:0 0 12px; letter-spacing:-0.5px;}
+  header p{color:var(--slate); max-width:640px; font-size:15px;}
+  .progress-wrap{max-width:960px; margin:28px auto 0; padding:0 24px;}
+  .progress-bar{
+    height:8px; background:rgba(142,205,221,0.15); border-radius:4px; overflow:hidden;
+    border:1px solid rgba(142,205,221,0.25);
+  }
+  .progress-fill{height:100%; background:linear-gradient(90deg, var(--green), var(--blue-line)); border-radius:4px; transition:width .3s ease;}
+  .progress-label{font-family:var(--mono); font-size:12px; color:var(--slate); margin-top:8px;}
+
+  main{max-width:960px; margin:0 auto; padding:36px 24px;}
+  .section-label{
+    font-family:var(--mono); font-size:12px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--blue-line); margin:32px 0 14px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{content:""; flex:1; height:1px; background:rgba(142,205,221,0.25);}
+
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media(max-width:640px){.grid{grid-template-columns:1fr;}}
+
+  .card{
+    position:relative;
+    border:1px solid rgba(142,205,221,0.35);
+    background:rgba(18,58,99,0.35);
+    border-radius:4px;
+    padding:20px 20px 18px;
+    text-decoration:none;
+    color:var(--paper);
+    display:block;
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  .card.ready:hover{transform:translateY(-2px); border-color:var(--blue-line);}
+  .card.pending{opacity:0.55; cursor:default; pointer-events:none;}
+  .card .num{font-family:var(--mono); font-size:11px; color:var(--amber); display:block; margin-bottom:8px;}
+  .card h3{font-family:var(--mono); font-size:17px; margin:0 0 6px;}
+  .card p{font-size:13px; color:var(--slate); margin:0;}
+  .badge{
+    position:absolute; top:16px; right:16px;
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:1px;
+    padding:3px 8px; border-radius:2px;
+  }
+  .badge.ready{background:rgba(76,175,136,0.15); color:var(--green); border:1px solid rgba(76,175,136,0.4);}
+  .badge.pending{background:rgba(226,104,90,0.1); color:var(--red); border:1px solid rgba(226,104,90,0.35);}
+
+  footer{
+    max-width:960px; margin:40px auto 0; padding:24px;
+    color:var(--slate); font-family:var(--mono); font-size:12px;
+    border-top:1px dashed rgba(142,205,221,0.35);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Tech Lead / Solution Architect · Interview Sprint</div>
+  <h1>Interview Prep Hub</h1>
+  <p>Every domain, one place. Same format throughout: Define → Why it exists → My real example → Trade-off, with a plain-English analogy and a "say this in interview" line for every concept.</p>
+</header>
+
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="progress-fill" style="width:44%;"></div></div>
+  <div class="progress-label">4 of 9 modules ready · rebuilding as we go</div>
+</div>
+
+<main>
+
+  <div class="section-label">Core Technical</div>
+  <div class="grid">
+    <a class="card pending" href="#">
+      <span class="badge pending">Rebuilding</span>
+      <span class="num">01</span>
+      <h3>Design Patterns</h3>
+      <p>SOLID, Creational, Structural, Behavioural — analogies + trade-offs</p>
+    </a>
+    <a class="card pending" href="#">
+      <span class="badge pending">Rebuilding</span>
+      <span class="num">02</span>
+      <h3>.NET Core</h3>
+      <p>DI lifecycle, middleware pipeline, async/await, EF Core, Minimal APIs</p>
+    </a>
+    <a class="card pending" href="#">
+      <span class="badge pending">Rebuilding</span>
+      <span class="num">03</span>
+      <h3>Angular</h3>
+      <p>Change Detection, Signals, RxJS, NgModules vs Standalone, State</p>
+    </a>
+    <a class="card ready" href="spring-java.html">
+      <span class="badge ready">Ready</span>
+      <span class="num">07</span>
+      <h3>Spring Java</h3>
+      <p>Mapped concept-by-concept from your .NET/C# knowledge</p>
+    </a>
+  </div>
+
+  <div class="section-label">Architecture & Systems</div>
+  <div class="grid">
+    <a class="card ready" href="architecture.html">
+      <span class="badge ready">Ready</span>
+      <span class="num">06</span>
+      <h3>Architecture</h3>
+      <p>Microservices, CQRS, Event-Driven, Saga, DDD</p>
+    </a>
+    <a class="card pending" href="#">
+      <span class="badge pending">Pending</span>
+      <span class="num">08</span>
+      <h3>AWS</h3>
+      <p>Scaling, Serverless, ALB/NLB, SQS/SNS</p>
+    </a>
+    <a class="card pending" href="#">
+      <span class="badge pending">Pending</span>
+      <span class="num">09</span>
+      <h3>Azure</h3>
+      <p>AKS, Functions, Service Bus, APIM</p>
+    </a>
+  </div>
+
+  <div class="section-label">Testing & AI</div>
+  <div class="grid">
+    <a class="card pending" href="#">
+      <span class="badge pending">Rebuilding</span>
+      <span class="num">04</span>
+      <h3>JUnit & Mockito</h3>
+      <p>Mapped from .NET/xUnit/Moq, Spring Boot Test layers, Testcontainers</p>
+    </a>
+    <a class="card pending" href="#">
+      <span class="badge pending">Rebuilding</span>
+      <span class="num">05</span>
+      <h3>Agentic AI / Copilot / MCP</h3>
+      <p>Your sanctions API story, prompt patterns, MCP architecture</p>
+    </a>
+  </div>
+
+  <div class="section-label">Final Prep</div>
+  <div class="grid">
+    <a class="card pending" href="#">
+      <span class="badge pending">Pending</span>
+      <span class="num">10</span>
+      <h3>Mock Interview Drill</h3>
+      <p>Cross-domain rapid-fire, once everything above is ready</p>
+    </a>
+  </div>
+
+</main>
+
+<footer>
+  TECH LEAD INTERVIEW SPRINT · Hub v1 · Re-open this file any time — links activate as each module ships.
+</footer>
+
+</body>
+</html>
