@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Patterns — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 01 / Design Patterns</div>
+  <h1>Design Patterns & SOLID</h1>
+  <p>The vocabulary every architect interview leans on. Each pattern below: what problem it solves, a real analogy, and when NOT to reach for it — because knowing when to avoid a pattern is what separates senior from junior answers.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#solid">01 SOLID</a>
+  <a href="#creational">02 Creational</a>
+  <a href="#structural">03 Structural</a>
+  <a href="#behavioural">04 Behavioural</a>
+  <a href="#drill">05 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="solid" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>SOLID Principles</h2>
+  <div class="tagline">The five rules that make code changeable without fear</div>
+
+  <div class="analogy"><b>Analogy:</b> A well-designed kitchen: each appliance does one job (SOLID's S), you can swap a hand mixer for a stand mixer without rewiring the kitchen (O and L), you don't wire the fridge into the toaster's circuit (I), and appliances plug into a standard socket, not directly into the wall's wiring (D).</div>
+
+  <div class="block-title">S — Single Responsibility</div>
+  <p><b>Define:</b> A class should have one reason to change. <b>Why:</b> When a class does 3 unrelated things, a change to one breaks the other two unexpectedly. <b>My example:</b> In the sanctions API, keeping fuzzy/phonetic/Levenshtein matchers as separate classes rather than one giant "Matcher god class" meant tuning one algorithm's weight never risked breaking another's logic. <b>Trade-off:</b> Taken too far, you get dozens of tiny classes and lose the big picture — a smell interviewers call "anemic over-decomposition."</p>
+
+  <div class="block-title">O — Open/Closed</div>
+  <p><b>Define:</b> Open for extension, closed for modification — add new behavior without editing existing, tested code. <b>My example:</b> Adding a 4th watchlist source (beyond OFAC SDN/Non-SDN/UN) should mean adding a new config entry and a new matcher implementation, not editing the core screening loop. <b>Trade-off:</b> Over-applying this upfront (speculative abstraction for extension points you'll never use) is wasted complexity — YAGNI cuts against blind Open/Closed application.</p>
+
+  <div class="block-title">L — Liskov Substitution</div>
+  <p><b>Define:</b> A subclass must be usable anywhere its base class is expected, without breaking correctness. <b>Classic violation:</b> a Square extending Rectangle that overrides SetWidth to also change height — breaks callers that assume width/height are independent. <b>Trade-off:</b> This is why "is-a" inheritance is often replaced with composition/interfaces in modern C# and Java — safer to satisfy LSP by design.</p>
+
+  <div class="block-title">I — Interface Segregation</div>
+  <p><b>Define:</b> Don't force a class to implement methods it doesn't need — many small interfaces beat one fat interface. <b>My example:</b> An IScreeningEngine interface with just Screen() is safer than one bloated IWatchlistService with Screen(), Ingest(), Audit(), Report() — a consumer that only screens shouldn't be forced to stub out Ingest(). <b>Trade-off:</b> Too many micro-interfaces make the codebase hard to navigate — balance matters.</p>
+
+  <div class="block-title">D — Dependency Inversion</div>
+  <p><b>Define:</b> Depend on abstractions, not concrete implementations — high-level modules shouldn't know the low-level details. <b>My example:</b> The screening service depends on an IMatcher interface, not a concrete FuzzyMatcher class directly — this is exactly what makes DI containers (services.AddScoped&lt;IMatcher, FuzzyMatcher&gt;) useful at all. <b>Trade-off:</b> None really — this is close to universally good, the only cost is one extra layer of indirection to read through.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"SOLID isn't a checklist I apply mechanically — it's a set of smells I watch for. If I catch myself writing 'and' when describing what a class does, that's an SRP violation. If I'm forced to touch tested code to add a feature, that's an OCP violation. I try to name the smell, not just recite the letter."</p>
+  </div>
+</section>
+
+<section class="panel" id="creational" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Creational Patterns</h2>
+  <div class="tagline">Controlling how objects get built, so construction logic doesn't leak everywhere</div>
+
+  <div class="block-title">Factory Method</div>
+  <p><b>Define:</b> Delegate object creation to a method/class instead of calling <code>new</code> directly, so the caller doesn't need to know the concrete type. <b>Analogy:</b> Ordering "a coffee" at a counter — you don't specify the machine, beans, or grind; the barista (factory) decides based on what you ordered. <b>My example:</b> A MatcherFactory that returns the right matcher (fuzzy/phonetic/Levenshtein) based on config, so the screening loop never hardcodes a concrete matcher type. <b>Trade-off:</b> Adds a layer of indirection — overkill if you only ever have one implementation.</p>
+
+  <div class="block-title">Builder</div>
+  <p><b>Define:</b> Construct a complex object step-by-step instead of a constructor with 10 parameters. <b>Analogy:</b> Building a sandwich at Subway — you choose bread, then protein, then toppings, one decision at a time, rather than shouting all 10 choices at once. <b>Trade-off:</b> Unnecessary for objects with 2-3 simple fields — just use a constructor or object initializer.</p>
+
+  <div class="block-title">Singleton</div>
+  <p><b>Define:</b> Ensure exactly one instance of a class exists app-wide. <b>My example:</b> A shared, in-memory cache of loaded watchlist data (OFAC/UN) — you don't want every request reloading and re-parsing the sanctions list from disk. <b>Trade-off:</b> Notoriously overused — introduces global mutable state, makes unit testing harder (hidden dependency), and causes thread-safety bugs if not handled carefully. Most DI containers replace the need for manual Singletons — `AddSingleton` in .NET gives you this safely through the container instead of a static field.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'm cautious with Singleton specifically — it's the pattern most likely to be overused. I'd rather let the DI container manage a single instance's lifetime than hand-roll a static singleton, because the container gives me the same benefit without the global-state testing pain."</p>
+  </div>
+</section>
+
+<section class="panel" id="structural" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Structural Patterns</h2>
+  <div class="tagline">Composing classes and objects into larger structures cleanly</div>
+
+  <div class="block-title">Adapter</div>
+  <p><b>Define:</b> Convert one interface into another the client expects, without changing either side. <b>Analogy:</b> A travel plug adapter — doesn't change the wall socket or your laptop charger, just bridges the mismatch. <b>My example:</b> If OFAC's API returns one JSON shape and UN's returns another, an adapter per source normalizes both into one internal WatchlistEntry shape before matching runs.</p>
+
+  <div class="block-title">Decorator</div>
+  <p><b>Define:</b> Add behavior to an object dynamically by wrapping it, without modifying its class. <b>Analogy:</b> Adding toppings to a pizza — each topping wraps the base without changing the dough recipe. <b>My example:</b> Wrapping the core matcher with a caching decorator or a logging decorator — same IMatcher interface, extra behavior layered on top. <b>Trade-off:</b> Many stacked decorators become hard to debug — you lose a single obvious place to set a breakpoint.</p>
+
+  <div class="block-title">Facade</div>
+  <p><b>Define:</b> Provide one simple interface over a complex subsystem. <b>Analogy:</b> A car's ignition switch — one turn of a key hides the complexity of starter motor, fuel injection, and spark plugs. <b>My example:</b> A single `ScreeningFacade.Screen(name)` hiding the orchestration across normalization → fuzzy match → phonetic match → weighted scoring → threshold check.</p>
+
+  <div class="block-title">Proxy</div>
+  <p><b>Define:</b> A stand-in that controls access to a real object — for lazy loading, caching, access control, or logging. <b>My example:</b> EF Core's lazy-loading proxies are a textbook example you already use daily — accessing a navigation property transparently triggers a DB query behind a proxy object.</p>
+</section>
+
+<section class="panel" id="behavioural" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Behavioural Patterns</h2>
+  <div class="tagline">How objects communicate and share responsibility for a behavior</div>
+
+  <div class="block-title">Strategy</div>
+  <p><b>Define:</b> Encapsulate interchangeable algorithms behind a common interface, selected at runtime. <b>Analogy:</b> Choosing a route on a GPS app — fastest, shortest, or avoid tolls — same destination, swappable strategy. <b>My example:</b> Fuzzy matching, phonetic matching, and Levenshtein distance are three interchangeable IMatchStrategy implementations combined with weights — the exact real pattern behind the sanctions API's multi-algorithm scoring. This is my strongest, most concrete real-world Strategy pattern story.</p>
+
+  <div class="block-title">Observer</div>
+  <p><b>Define:</b> One-to-many notification — subject notifies all subscribed observers when its state changes, without knowing who they are. <b>Analogy:</b> A YouTube channel notifying all subscribers on a new upload. <b>My example:</b> C#'s <code>event</code>/<code>IObservable</code>, or Angular's RxJS Subject — same pattern, different syntax. It's also the foundation event-driven architecture builds on at a larger scale.</p>
+
+  <div class="block-title">Chain of Responsibility</div>
+  <p><b>Define:</b> Pass a request along a chain of handlers until one handles it. <b>Analogy:</b> Tech support escalation — Tier 1 tries, escalates to Tier 2, then Tier 3. <b>My example:</b> ASP.NET Core middleware pipeline is exactly Chain of Responsibility — each middleware decides to handle, short-circuit, or pass along.</p>
+
+  <div class="block-title">Template Method</div>
+  <p><b>Define:</b> Define the skeleton of an algorithm in a base class, letting subclasses override specific steps. <b>Analogy:</b> A recipe card that says "prepare base, add filling, bake" — the filling step varies (apple vs cherry pie), the overall process doesn't. <b>Trade-off:</b> Relies on inheritance, which is less flexible than Strategy's composition — modern guidance often prefers Strategy over Template Method for this reason.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"My clearest real pattern story is Strategy — the sanctions matching engine literally is three interchangeable scoring strategies combined with configurable weights. I'd lead with that rather than reciting textbook definitions, since it shows the pattern solving a real, specific problem."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="tagline">Name the pattern from the smell</div>
+  <div class="qa">
+    <div class="qa-item"><div class="q">"I have 5 nearly-identical algorithms selected by an if/else chain"</div><div class="a">Strategy pattern — extract each branch into its own implementation of a shared interface.</div></div>
+    <div class="qa-item"><div class="q">"My constructor takes 9 parameters"</div><div class="a">Builder pattern — or reconsider if the class is doing too much (SRP smell underneath).</div></div>
+    <div class="qa-item"><div class="q">"Two APIs return incompatible shapes for the same concept"</div><div class="a">Adapter pattern.</div></div>
+    <div class="qa-item"><div class="q">"I need exactly one shared cache instance app-wide"</div><div class="a">Singleton — but prefer registering it as AddSingleton in the DI container over a hand-rolled static.</div></div>
+    <div class="qa-item"><div class="q">"A request should be handled by whichever of several handlers is able to"</div><div class="a">Chain of Responsibility — same shape as middleware pipelines.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 01 — DESIGN PATTERNS · Interview Prep Series</footer>
+</body>
+</html>
