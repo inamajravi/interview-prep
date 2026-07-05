@@ -79,6 +79,7 @@
   <a href="#cloud">Cloud</a>
   <a href="#ai">Agentic AI</a>
   <a href="#mq">Message Queues</a>
+  <a href="#k8s">Kubernetes</a>
   <a href="#checklist">Final Checklist</a>
 </nav>
 
@@ -188,6 +189,18 @@
     <div class="chip"><b>DLQ</b>Stops a permanently-broken message from retrying forever — surfaces it instead.</div>
     <div class="chip"><b>SQS vs SNS</b>One consumer (queue) vs fan-out to all subscribers (topic) — combine via SNS→SQS fan-out.</div>
     <div class="chip"><b>FIFO</b>Use only when order matters for a specific entity (e.g. same account) — not a default.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="k8s">
+  <h3><span class="n">09</span> Kubernetes</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Pod → Deployment → Service</b>Disposable unit → keeps N running → stable identity in front of churn.</div>
+    <div class="chip"><b>Liveness vs Readiness</b>Restart-worthy vs traffic-worthy — never check downstream deps in liveness.</div>
+    <div class="chip"><b>Secrets are NOT encrypted by default</b>Base64 only — need etcd encryption + external secrets manager for real protection.</div>
+    <div class="chip"><b>Ingress</b>One entry point, path/host routing — cheaper than a LoadBalancer per service.</div>
+    <div class="chip"><b>Canary</b>Lowest blast radius for a risky release — small % of traffic first.</div>
+    <div class="chip"><b>StatefulSet</b>Stable identity + per-Pod storage — but managed DB is often preferred over running one in-cluster.</div>
   </div>
 </div>
 

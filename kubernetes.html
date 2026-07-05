@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 12 / Kubernetes</div>
+  <h1>Kubernetes — High-Level Interview Questions</h1>
+  <p>Pitched at the level a Tech Lead / Solution Architect interview actually probes: what each building block is for and when you'd reach for it — not YAML syntax or kubectl flags.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#core">01 Core Objects</a>
+  <a href="#scaling">02 Scaling & Self-Healing</a>
+  <a href="#networking">03 Networking</a>
+  <a href="#config">04 Config & Secrets</a>
+  <a href="#deploy">05 Deployment Strategies</a>
+  <a href="#stateful">06 Stateful Workloads</a>
+  <a href="#drill">07 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="core" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Core Objects — Pod, Deployment, Service</h2>
+  <div class="tagline">The three building blocks nearly everything else sits on top of</div>
+
+  <div class="block-title">Pod</div>
+  <p><b>Define:</b> The smallest deployable unit in Kubernetes — one or more tightly coupled containers that always run together on the same node, sharing network and storage. <b>Analogy:</b> A pod is like a shared apartment — the containers inside it share the same address (IP) and utilities (network/volumes), even if they're separate "tenants" (e.g. a main app container plus a logging sidecar).</p>
+  <p><b>Why usually more than one container:</b> A "sidecar" pattern — a helper container (log shipper, proxy, cert renewer) that needs to live and die alongside the main container, sharing its network namespace.</p>
+
+  <div class="block-title">Deployment</div>
+  <p><b>Define:</b> A controller that manages a set of identical Pods — declares "I want N replicas of this Pod spec running," and continuously reconciles reality toward that desired state, handling rolling updates and rollbacks. <b>Analogy:</b> A Deployment is a restaurant manager who always makes sure exactly 5 tables are staffed — if a server calls in sick (a Pod crashes), the manager immediately calls in a replacement, without you having to notice or intervene.</p>
+
+  <div class="block-title">Service</div>
+  <p><b>Define:</b> A stable network identity (a fixed DNS name/IP) in front of a changing set of Pods. Pods are ephemeral — they get recreated with new IPs constantly — so nothing should ever talk to a Pod IP directly. A Service is the thing that stays constant while Pods behind it come and go.</p>
+  <div class="analogy"><b>Analogy:</b> A Service is a company's general support phone number — it never changes, even though the actual support agent who picks up (the Pod) rotates constantly. Callers never need the agent's personal number.</div>
+
+  <div class="block-title">Trade-off / why not just run containers directly</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">What you gain</span>Self-healing, declarative desired-state management, and stable networking despite constantly churning Pod IPs.</div>
+    <div class="avoid-box"><span class="lbl">What it costs</span>Real operational complexity — networking, RBAC, and resource management all become Kubernetes-specific concerns your team needs to own.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The core insight underneath Pods, Deployments, and Services is that Kubernetes assumes Pods are disposable and will die — the Deployment's job is replacing them without anyone noticing, and the Service's job is giving callers something stable to talk to despite that constant churn underneath."</p>
+  </div>
+</section>
+
+<section class="panel" id="scaling" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Scaling & Self-Healing</h2>
+  <div class="tagline">Liveness/Readiness probes, and the Horizontal Pod Autoscaler</div>
+
+  <div class="block-title">Liveness vs Readiness Probes</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Liveness probe</span>"Is this container still alive?" If it fails repeatedly, Kubernetes kills and restarts the container. Use for detecting deadlocks/hangs.</div>
+    <div class="avoid-box"><span class="lbl">Readiness probe</span>"Is this container ready to receive traffic right now?" If it fails, the Pod is removed from the Service's routing (but NOT restarted) — used for things like "still warming up a cache" or "temporarily overloaded, back off."</div>
+  </div>
+  <div class="analogy"><b>Analogy:</b> Liveness is a pulse check — no pulse, you get resuscitated (restarted). Readiness is asking a waiter "can you take an order right now?" — if they're mid-carrying a heavy tray, you don't fire them, you just don't send them a new table until they say they're ready again.</div>
+
+  <div class="block-title">Common interview trap</div>
+  <div class="avoid-box"><span class="lbl">The mistake</span>Making the liveness probe check downstream dependencies (like "can I reach the database?"). If the database blips, every Pod's liveness probe fails simultaneously, and Kubernetes restarts your <i>entire fleet</i> — making a downstream outage far worse. Liveness should only check "is this process itself stuck," not external dependencies.</div>
+
+  <div class="block-title">Horizontal Pod Autoscaler (HPA)</div>
+  <p><b>Define:</b> Automatically adjusts the number of Pod replicas based on observed metrics (CPU, memory, or custom metrics like request queue depth) against a target threshold. <b>Why it exists:</b> Same reasoning as an AWS Auto Scaling Group — match capacity to actual demand instead of provisioning for peak load 24/7.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The distinction I always draw is liveness answers 'should this be restarted,' readiness answers 'should this receive traffic right now' — and the classic bug is conflating them, where a liveness probe checking a downstream dependency turns one outage into a fleet-wide restart storm."</p>
+  </div>
+</section>
+
+<section class="panel" id="networking" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Networking — Ingress & Service Types</h2>
+  <div class="tagline">How traffic actually gets from outside the cluster to a Pod</div>
+
+  <div class="block-title">Service types</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">ClusterIP (default)</span>Only reachable from inside the cluster — for internal service-to-service communication.</div>
+    <div class="avoid-box"><span class="lbl">NodePort</span>Opens a specific port on every node — simple but clunky, rarely used directly in production.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">LoadBalancer</span>Provisions an actual cloud load balancer (an AWS ALB/NLB, an Azure LB) in front of the Service — the standard way to expose one service externally on a cloud provider.</div>
+  </div>
+
+  <div class="block-title">Ingress</div>
+  <p><b>Define:</b> A single entry point that routes external HTTP(S) traffic to multiple Services based on hostname or path — conceptually the Kubernetes-native equivalent of an ALB doing path-based routing, or an API Gateway sitting in front of several backend services.</p>
+  <div class="analogy"><b>Analogy:</b> If each Service with its own LoadBalancer is like giving every department in a building its own separate street entrance, Ingress is one lobby with a directory board routing visitors to the right department based on who they're asking for — one entry point, many destinations, instead of N separate cloud load balancers costing N times as much.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use Ingress when</span>Multiple services need external HTTP access — cheaper and more manageable than one LoadBalancer per service.</div>
+    <div class="avoid-box"><span class="lbl">Use LoadBalancer directly when</span>Exposing a single non-HTTP service (e.g. raw TCP), where Ingress's HTTP-routing features don't apply.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I default to Ingress over one LoadBalancer per Service, for the same reason I'd default to an API Gateway over exposing every microservice individually — one managed entry point, path/host-based routing, and it avoids paying for and managing N separate cloud load balancers."</p>
+  </div>
+</section>
+
+<section class="panel" id="config" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>ConfigMaps & Secrets</h2>
+  <div class="tagline">Externalizing configuration from the container image — same instinct as appsettings.json layering</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">ConfigMap</span>Non-sensitive configuration (feature flags, URLs, log levels) injected into Pods as environment variables or mounted files — decouples config from the image so you don't rebuild a container just to change a setting.</div>
+    <div class="avoid-box"><span class="lbl">Secret</span>Same mechanism, for sensitive data (API keys, DB passwords, certs) — base64-encoded at rest by default, which is <b>encoding, not encryption</b>. Real protection requires enabling encryption-at-rest for etcd and/or integrating an external secrets manager (AWS Secrets Manager, HashiCorp Vault).</div>
+  </div>
+
+  <div class="block-title">Common interview trap</div>
+  <div class="avoid-box"><span class="lbl">The misconception</span>Assuming Kubernetes Secrets are encrypted by default just because they're a separate object type from ConfigMaps — they're base64-encoded, which anyone with API access can trivially decode. This is one of the most common false assumptions candidates state confidently and get caught on.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'm careful not to overstate what a Kubernetes Secret protects — out of the box it's base64 encoding, not encryption, so for anything genuinely sensitive I'd want etcd encryption-at-rest enabled and ideally integration with an external secrets manager, not just relying on the Secret object type alone."</p>
+  </div>
+</section>
+
+<section class="panel" id="deploy" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Deployment Strategies</h2>
+  <div class="tagline">Rolling update, blue-green, and canary — same trade-off spectrum as any deployment strategy</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Rolling Update (Deployment's default)</span>Gradually replaces old Pods with new ones, a few at a time, keeping the service available throughout. Simple, built in, no extra infrastructure — but a bad new version is exposed to some real traffic before you notice.</div>
+    <div class="avoid-box"><span class="lbl">Blue-Green</span>Run the full new version alongside the full old version, then switch traffic all at once. Instant rollback (just switch back), but requires double the infrastructure temporarily.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Canary</span>Route a small percentage of real traffic (5%, 10%) to the new version first, watch metrics, then gradually increase. Lowest blast radius for a bad release, but needs more sophisticated traffic-splitting (often a service mesh like Istio, or Ingress-level weighting) and more operational maturity to run well.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'd pick based on blast radius tolerance and infrastructure maturity — rolling update as the sensible default for most services, blue-green when instant rollback matters more than infrastructure cost, and canary when the team already has the traffic-splitting tooling and wants the smallest possible exposure for a risky release."</p>
+  </div>
+</section>
+
+<section class="panel" id="stateful" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>StatefulSets</h2>
+  <div class="tagline">For workloads where Pod identity and storage actually need to persist</div>
+
+  <p><b>Define:</b> Unlike a Deployment's interchangeable, identical Pods, a StatefulSet gives each Pod a stable, unique identity (predictable names like <code>db-0</code>, <code>db-1</code>) and a persistent volume that follows that specific Pod even if it's rescheduled — used for databases, message brokers, and anything where "which specific instance" matters.</p>
+
+  <div class="analogy"><b>Analogy:</b> A Deployment's Pods are like disposable coffee cups — any cup works, grab a new one if one breaks. A StatefulSet's Pods are like numbered lockers in a gym — locker #7 is always locker #7, keeps the same contents, even if you leave and come back later.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Running stateful workloads directly in-cluster — databases, Kafka/Zookeeper, anything needing stable network identity and per-instance persistent storage.</div>
+    <div class="avoid-box"><span class="lbl">Reality check</span>Most teams prefer a managed external database (RDS, managed Kafka) over running stateful workloads inside Kubernetes themselves — StatefulSets solve a real problem, but running your own database in K8s adds significant operational burden most teams choose to avoid when a managed alternative exists.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"StatefulSets exist for real reasons — stable identity and per-Pod storage — but in practice, I'd lean toward a managed database service over running one inside Kubernetes via a StatefulSet, unless there's a specific reason (cost, portability, or an existing platform standard) pushing toward running it in-cluster."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Why does a Service exist if Pods already have IPs?</div><div class="a">Pod IPs are ephemeral and change constantly — a Service gives callers a stable identity that doesn't change as Pods are recreated underneath it.</div></div>
+    <div class="qa-item"><div class="q">Liveness probe checks the database and it's temporarily down — what happens?</div><div class="a">Every Pod's liveness probe fails simultaneously, and Kubernetes restarts the entire fleet — a fleet-wide restart storm caused by a downstream dependency, which is why liveness should never check external dependencies.</div></div>
+    <div class="qa-item"><div class="q">Are Kubernetes Secrets encrypted by default?</div><div class="a">No — base64-encoded, which is trivially reversible. Real protection needs etcd encryption-at-rest and/or an external secrets manager.</div></div>
+    <div class="qa-item"><div class="q">Cheapest way to expose 5 HTTP services externally?</div><div class="a">One Ingress routing by host/path, instead of 5 separate LoadBalancer Services (5x the cloud load balancer cost).</div></div>
+    <div class="qa-item"><div class="q">Lowest blast-radius deployment strategy for a risky release?</div><div class="a">Canary — small percentage of real traffic first, watch metrics, then ramp up.</div></div>
+    <div class="qa-item"><div class="q">When do you reach for a StatefulSet instead of a Deployment?</div><div class="a">When Pod identity and per-instance persistent storage matter — e.g. running a database or Kafka directly in-cluster — though a managed external service is often preferred in practice.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 12 — KUBERNETES · Interview Prep Series</footer>
+</body>
+</html>
