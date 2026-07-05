@@ -78,6 +78,7 @@
   <a href="#testing">Testing</a>
   <a href="#cloud">Cloud</a>
   <a href="#ai">Agentic AI</a>
+  <a href="#mq">Message Queues</a>
   <a href="#checklist">Final Checklist</a>
 </nav>
 
@@ -174,6 +175,19 @@
     <div class="chip"><b>MCP</b>Standard protocol so any AI client calls any tool — N×M → N+M integrations.</div>
     <div class="chip"><b>Best prompting habit</b>Ask for a plan before code on non-trivial tasks.</div>
     <div class="chip"><b>Your framing</b>Architect/reviewer — same skill as reviewing a junior dev's PR.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="mq">
+  <h3><span class="n">08</span> Message Queues</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Why a queue at all</b>Decouples producer/consumer — producer's job ends at "safely enqueued."</div>
+    <div class="chip"><b>Delivery guarantee</b>At-least-once is the real-world default — pair with idempotency, don't rely on the broker for exactly-once.</div>
+    <div class="chip"><b>Idempotency</b>Check a transaction ID against a persisted record before acting — makes duplicates harmless.</div>
+    <div class="chip"><b>Visibility timeout</b>Message re-appears if a consumer dies mid-processing without deleting it.</div>
+    <div class="chip"><b>DLQ</b>Stops a permanently-broken message from retrying forever — surfaces it instead.</div>
+    <div class="chip"><b>SQS vs SNS</b>One consumer (queue) vs fan-out to all subscribers (topic) — combine via SNS→SQS fan-out.</div>
+    <div class="chip"><b>FIFO</b>Use only when order matters for a specific entity (e.g. same account) — not a default.</div>
   </div>
 </div>
 

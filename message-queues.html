@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Message Queues — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .flow-step{
+    display:grid;
+    grid-template-columns:36px 1fr;
+    gap:14px;
+    margin:0 0 4px;
+    position:relative;
+    padding-bottom:22px;
+  }
+  .flow-step:not(:last-child)::before{
+    content:"";
+    position:absolute;
+    left:17px; top:32px; bottom:-4px;
+    width:2px;
+    background:repeating-linear-gradient(to bottom, var(--blue-line) 0, var(--blue-line) 4px, transparent 4px, transparent 8px);
+  }
+  .flow-num{
+    width:36px; height:36px; border-radius:50%;
+    background:var(--blue-deep); border:2px solid var(--amber);
+    color:var(--amber); font-family:var(--mono); font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; flex-shrink:0;
+  }
+  .flow-content h4{margin:4px 0 4px; font-family:var(--mono); font-size:14.5px; color:var(--paper);}
+  .flow-content p{margin:0; font-size:13.5px; color:#DCEBF2;}
+  .flow-content .aws-tag{
+    display:inline-block; font-family:var(--mono); font-size:10.5px;
+    color:var(--amber); border:1px solid rgba(242,165,65,0.4);
+    background:rgba(242,165,65,0.08); padding:2px 7px; border-radius:2px;
+    margin-top:6px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 11 / Message Queues</div>
+  <h1>Message Queues, from the Ground Up</h1>
+  <p>Built to actually close a gap, not just to sound good in an interview. Core concepts first — the ones every distributed system leans on — then how they map onto specific AWS services, using one real payment transaction traced end to end.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#basics">01 What & Why</a>
+  <a href="#delivery">02 Delivery Guarantees</a>
+  <a href="#ordering">03 Ordering & FIFO</a>
+  <a href="#dlq">04 Visibility Timeout & DLQ</a>
+  <a href="#idempotency">05 Idempotency</a>
+  <a href="#awsmap">06 AWS Service Map</a>
+  <a href="#payment">07 Payment Walkthrough</a>
+  <a href="#drill">08 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="basics" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>What a Message Queue Actually Is</h2>
+  <div class="tagline">A buffer between two things that shouldn't have to wait on each other</div>
+
+  <p><b>Define:</b> A message queue is a durable, ordered (or semi-ordered) buffer sitting between a <b>producer</b> (something that creates work) and a <b>consumer</b> (something that processes it). The producer drops a message and moves on immediately; the consumer picks it up whenever it's ready, at its own pace.</p>
+
+  <div class="analogy"><b>Analogy:</b> A restaurant's order ticket rail. The waiter (producer) clips an order and walks away immediately — they don't stand at the pass watching it cook. The kitchen (consumer) pulls tickets in whatever order it can handle them, at its own pace. If the kitchen gets backed up, tickets just wait on the rail — the waiter isn't blocked, and no order gets lost.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Without a queue, the producer would have to call the consumer directly and wait for it to finish (a synchronous call) — meaning if the consumer is slow, down, or overwhelmed, the producer is stuck too. A queue decouples the two: the producer's job is done the moment the message is safely queued, regardless of what state the consumer is in.</p>
+
+  <div class="block-title">The three things a queue actually buys you</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Decoupling</span>Producer and consumer don't need to be online at the same time, or even know about each other's existence.</div>
+    <div class="use-box"><span class="lbl">Buffering / load leveling</span>A sudden spike in producers (1000 orders in one second) doesn't overwhelm the consumer — it just queues up and drains at a sustainable rate.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Reliability</span>If the consumer crashes mid-processing, the message isn't lost — it becomes visible again for another consumer to pick up.</div>
+    <div class="avoid-box"><span class="lbl">The cost</span>You trade immediate consistency for eventual processing — the producer no longer gets an instant "yes, this fully succeeded" answer back, just "this was safely accepted."</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"A queue's real value is decoupling producer and consumer lifecycles — the producer's responsibility ends at 'safely enqueued,' not 'fully processed.' That's also the trade-off: you give up the immediate synchronous confirmation you'd get from a direct call."</p>
+  </div>
+</section>
+
+<section class="panel" id="delivery" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Delivery Guarantees</h2>
+  <div class="tagline">The single most-asked message queue interview question</div>
+
+  <div class="tradeoff-grid">
+    <div class="avoid-box"><span class="lbl">At-most-once</span>Message is delivered zero or one times — if something fails, it's just lost. Rare in practice; usually only acceptable for non-critical telemetry/logging.</div>
+    <div class="use-box"><span class="lbl">At-least-once</span>Message is delivered one or more times — never silently lost, but the consumer might see the same message twice. This is what almost every real broker (SQS, Kafka, RabbitMQ default) actually gives you.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Exactly-once</span>Message is processed exactly one time, no duplicates, nothing lost — the ideal, but genuinely hard to guarantee across a network; usually achieved by combining at-least-once delivery with idempotent processing on the consumer side, rather than a broker magically guaranteeing it alone.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> At-least-once is a courier who keeps re-knocking and re-delivering a parcel until you sign for it, even if you already have three copies from earlier failed handoffs — you're guaranteed to get it, but you might get it more than once. Exactly-once is that same courier, except you've told the front desk to reject any parcel with a tracking number they've already logged as delivered — that dedup step is what turns "at least once" into "effectively exactly once."</div>
+
+  <div class="block-title">Why it exists this way</div>
+  <p>Guaranteeing true exactly-once delivery across an unreliable network is provably very hard — you can't know for certain whether a lost acknowledgment means the consumer didn't get the message, or got it and just failed to confirm. Most systems sidestep this entirely: accept that delivery is at-least-once, and make processing <b>idempotent</b> so duplicates are harmless.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I design for at-least-once delivery by default, because that's the honest guarantee most brokers actually provide, and I get to 'effectively exactly-once' by making the consumer idempotent — checking a unique message or transaction ID before acting, rather than trusting the broker alone to prevent duplicates."</p>
+  </div>
+</section>
+
+<section class="panel" id="ordering" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Ordering & FIFO</h2>
+  <div class="tagline">Most queues don't guarantee order — and most of the time, that's fine</div>
+
+  <p><b>Define:</b> A <b>standard</b> queue makes no promise about message order — messages can be delivered out of sequence, especially under load with multiple consumers. A <b>FIFO</b> queue guarantees strict order within a defined group, at the cost of lower throughput.</p>
+
+  <div class="analogy"><b>Analogy:</b> A standard queue is multiple checkout lanes at a supermarket — customers get served, but not strictly in the order they arrived across all lanes. A FIFO queue is a single-file line for one specific till — whoever got in line first is served first, guaranteed, but that means only one line, so it's slower overall.</div>
+
+  <div class="block-title">Why it matters</div>
+  <p>Order rarely matters globally — it matters <i>within a related sequence</i>. Example: two updates to the <i>same</i> payment must apply in order (charge, then refund — not refund, then charge). But two unrelated payments for two different customers don't need to be ordered relative to each other at all. FIFO queues let you scope ordering to a <b>message group</b> (e.g. per payment ID) instead of forcing the entire queue into a single-file line.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use FIFO when</span>Sequence genuinely matters for a specific entity — financial transactions on the same account, state transitions that must apply in order.</div>
+    <div class="avoid-box"><span class="lbl">Use Standard when</span>Messages are independent of each other — most notification, logging, and fan-out workloads don't need strict ordering and gain meaningfully higher throughput from Standard.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I don't reach for FIFO by default — I ask whether ordering actually matters for a specific related sequence, like updates to the same payment, versus just wanting a vague sense of 'first in, first out' globally. Scoping to a message group ID gets you ordering exactly where you need it without paying the throughput cost everywhere."</p>
+  </div>
+</section>
+
+<section class="panel" id="dlq" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Visibility Timeout & Dead Letter Queues</h2>
+  <div class="tagline">What happens when a consumer picks up a message and then fails</div>
+
+  <p><b>Define — Visibility Timeout:</b> When a consumer pulls a message, the queue doesn't delete it immediately — it just hides it from other consumers for a set window (the visibility timeout). If the consumer finishes and explicitly deletes the message, it's gone for good. If the consumer crashes or times out without deleting it, the message becomes visible again for another consumer to retry.</p>
+
+  <div class="analogy"><b>Analogy:</b> Visibility timeout is exactly like a library checking out a book to you — it's marked unavailable to others while you have it. If you never return it and the loan period expires, it goes back on the shelf for someone else to borrow. It's not gone; it's just temporarily claimed.</div>
+
+  <p><b>Define — Dead Letter Queue (DLQ):</b> After a message fails processing and gets retried some maximum number of times without success, it's moved to a separate queue (the DLQ) instead of retrying forever — so one poisoned message can't loop endlessly and doesn't silently vanish either.</p>
+
+  <div class="block-title">Why both exist</div>
+  <p>Without visibility timeout, a crashed consumer would mean the message is just gone — the queue has no way to know the work didn't actually finish. Without a DLQ, a message that will <i>always</i> fail (a malformed payload, a permanently broken downstream call) would retry forever, endlessly consuming resources and never surfacing as a problem anyone notices.</p>
+
+  <div class="block-title">Trade-off / real-world tuning</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Visibility timeout too short</span>A slow-but-healthy consumer gets treated as failed, and the message gets duplicated to another consumer while the first is still working — set it comfortably above your typical processing time.</div>
+    <div class="avoid-box"><span class="lbl">Visibility timeout too long</span>A genuinely failed message sits invisible for a long time before anything can retry it — real processing delay for legitimate failures.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I always pair visibility timeout with a DLQ and a bounded retry count — visibility timeout handles the 'consumer crashed mid-work' case, the DLQ handles the 'this message will never succeed' case. Without a DLQ, a bad payload just retries forever and you never find out something's actually broken."</p>
+  </div>
+</section>
+
+<section class="panel" id="idempotency" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Idempotency</h2>
+  <div class="tagline">The property that makes "at-least-once delivery" safe to build on</div>
+
+  <p><b>Define:</b> An operation is idempotent if doing it once has the exact same effect as doing it multiple times. Processing the same message twice should produce the same end state as processing it once — not double-charge, not double-ship, not double-notify.</p>
+
+  <div class="analogy"><b>Analogy:</b> Pressing an elevator call button five times doesn't summon five elevators — the first press registers the request, and every press after that is a no-op against the same already-registered request. That's exactly the property you want from a payment handler processing a possibly-duplicated message.</div>
+
+  <div class="block-title">How you actually implement it</div>
+  <p>Attach a unique idempotency key to each logical operation (a payment transaction ID, an order ID) — before processing, check a store (a database unique constraint, a dedup table, or a cache) for whether that key has already been handled. If yes, skip straight to returning the already-known result instead of reprocessing.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Where it's essential</span>Anything involving money, state transitions, or external side-effects (charging a card, sending an email, decrementing inventory) — exactly where a duplicate causes real damage.</div>
+    <div class="avoid-box"><span class="lbl">Where it's overkill</span>Purely read-only or naturally idempotent operations (setting a field to a fixed value) don't need explicit dedup logic — they're already safe to repeat.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat idempotency as the thing that makes at-least-once delivery actually usable — I don't try to prevent duplicate delivery at the broker level, I make duplicate delivery harmless at the consumer level, using a transaction ID as the idempotency key checked against a persistent store before any side-effect happens."</p>
+  </div>
+</section>
+
+<section class="panel" id="awsmap" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>AWS Service Map</h2>
+  <div class="tagline">Which service, for which shape of problem</div>
+
+  <div class="mapping">
+    <span class="dotnet">General concept: Queue</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Amazon SQS</span>
+  </div>
+  <p><b>SQS (Simple Queue Service):</b> The default choice for point-to-point work distribution — one message, processed by exactly one consumer (or one per consumer group). Comes in two flavors: <b>Standard</b> (near-unlimited throughput, at-least-once, best-effort ordering) and <b>FIFO</b> (strict order per message group, at-least-once, exactly-once processing support via dedup, lower throughput ceiling).</p>
+
+  <div class="mapping">
+    <span class="dotnet">General concept: Topic / fan-out</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Amazon SNS</span>
+  </div>
+  <p><b>SNS (Simple Notification Service):</b> Pub/sub — one published message, delivered to every subscriber. On its own, SNS doesn't durably hold messages for slow consumers; it's commonly paired with SQS (SNS fans out to multiple SQS queues) to get fan-out <i>and</i> durable, independently-paced processing per subscriber.</p>
+
+  <div class="mapping">
+    <span class="dotnet">General concept: Ordered event stream / replay</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Amazon Kinesis / MSK</span>
+  </div>
+  <p><b>Kinesis Data Streams (or Managed Streaming for Kafka):</b> When you need an ordered, replayable log of events that multiple independent consumers can read at their own pace, from any point in history — not a queue that removes messages once processed. Reach for this when SQS/SNS's "process once and it's gone" model doesn't fit (e.g. analytics pipelines that need to reprocess history, multiple totally independent consumer groups reading the same stream).</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"My default decision tree: one consumer needs the work done once → SQS. Multiple independent systems need to react to the same event → SNS, usually fanning out to SQS for durability. Need a replayable, ordered event log multiple consumer groups can read independently → Kinesis or MSK. Most everyday microservice decoupling only ever needs the first two."</p>
+  </div>
+</section>
+
+<section class="panel" id="payment" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Payment Transaction — Traced End to End</h2>
+  <div class="tagline">Every concept above, in one concrete flow: a customer paying for an order</div>
+
+  <div class="flow-step">
+    <div class="flow-num">1</div>
+    <div class="flow-content">
+      <h4>Customer submits payment</h4>
+      <p>The checkout API validates the request, writes a "PaymentRequested" record to its own database (status: pending), and immediately returns "we've received your payment request" to the customer — it does not wait for the payment to actually process.</p>
+      <span class="aws-tag">API Gateway + Lambda / ECS</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num">2</div>
+    <div class="flow-content">
+      <h4>Message enqueued for payment processing</h4>
+      <p>The API publishes a message containing the payment details and a unique transaction ID onto a queue, then returns immediately. This is the decoupling point — the checkout API's job is done the moment this message is safely enqueued.</p>
+      <span class="aws-tag">Amazon SQS FIFO — message group = customer/account ID, so this customer's payments process in order</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num">3</div>
+    <div class="flow-content">
+      <h4>Payment processor consumes the message</h4>
+      <p>A dedicated payment-processing service pulls the message. Visibility timeout hides it from other consumers while this instance works. Before doing anything, it checks the transaction ID against a "processed transactions" table — this is the idempotency check, protecting against the message being delivered more than once.</p>
+      <span class="aws-tag">ECS/Lambda consumer + DynamoDB idempotency table</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num">4</div>
+    <div class="flow-content">
+      <h4>Charge attempted against the payment gateway</h4>
+      <p>The service calls the actual card network / payment gateway. On success, it records the transaction ID as processed, updates the payment status, and explicitly deletes the message from the queue — this is the point where visibility timeout would otherwise let it reappear.</p>
+      <span class="aws-tag">If this step throws (gateway timeout, transient error): don't delete the message — let it become visible again for a retry</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num">5</div>
+    <div class="flow-content">
+      <h4>Success fans out to everyone who needs to know</h4>
+      <p>On a successful charge, the service publishes a "PaymentSucceeded" event once — to a topic, not directly calling each downstream system. Order fulfillment, the customer notification service, and the accounting/ledger service each get their own copy, independently, without the payment service needing to know any of them exist.</p>
+      <span class="aws-tag">Amazon SNS → fanning out to separate SQS queues per subscriber (fulfillment, notifications, ledger)</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num">6</div>
+    <div class="flow-content">
+      <h4>Persistent failure → Dead Letter Queue</h4>
+      <p>If a charge keeps failing after the configured max retries (e.g. the card is genuinely declined, or the payload is malformed), the message moves to a DLQ instead of retrying forever. A separate alerting process watches the DLQ and flags it for manual review or triggers a "PaymentFailed" notification to the customer — the failure is visible and handled, not silently dropped or endlessly retried.</p>
+      <span class="aws-tag">SQS redrive policy → Dead Letter Queue + CloudWatch alarm on DLQ depth</span>
+    </div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The design decisions in this flow map directly onto the core concepts: FIFO scoped to the customer so their payments process in order without slowing down everyone else's; an idempotency check using the transaction ID so an at-least-once delivery guarantee can't cause a double charge; visibility timeout so a crashed consumer doesn't lose the message; and a DLQ so a genuinely broken payment surfaces as an alert instead of retrying forever or vanishing silently."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What's the actual value a queue adds over a direct API call?</div><div class="a">Decoupling — the producer's job ends at "safely enqueued," not "fully processed," so producer and consumer don't need to be online or fast at the same time.</div></div>
+    <div class="qa-item"><div class="q">What delivery guarantee do most real brokers actually provide?</div><div class="a">At-least-once — never silently lost, but the consumer might see a message more than once. Exactly-once is usually achieved by pairing this with idempotency, not by the broker alone.</div></div>
+    <div class="qa-item"><div class="q">How do you prevent a duplicate delivery from double-charging a customer?</div><div class="a">Idempotency key (the transaction ID) checked against a persisted "already processed" record before the charge happens.</div></div>
+    <div class="qa-item"><div class="q">What happens if a consumer crashes mid-processing?</div><div class="a">Visibility timeout expires without the message being deleted, so it becomes visible again for another consumer to retry.</div></div>
+    <div class="qa-item"><div class="q">Why does a Dead Letter Queue matter?</div><div class="a">Without it, a message that will always fail retries forever, wasting resources and never surfacing as a problem anyone can act on.</div></div>
+    <div class="qa-item"><div class="q">One event needs 3 independent downstream reactions — which AWS service?</div><div class="a">SNS fanning out to separate SQS queues per subscriber — fan-out plus durable, independently-paced processing.</div></div>
+    <div class="qa-item"><div class="q">When do you actually need FIFO instead of Standard SQS?</div><div class="a">When sequence matters for a specific related entity (e.g. updates to the same account) — not as a default for every queue.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 11 — MESSAGE QUEUES · Interview Prep Series</footer>
+</body>
+</html>
