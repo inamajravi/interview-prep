@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Structures & Complexity — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 13 / Foundations</div>
+  <h1>Data Structures & Complexity</h1>
+  <p>At architect level this isn't "reverse a linked list on a whiteboard" — it's "why did you pick this structure for this scale problem." Framed that way throughout.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#bigo">01 Big-O, Practically</a>
+  <a href="#hashmap">02 Hash Map</a>
+  <a href="#trees">03 Trees & Tries</a>
+  <a href="#heaps">04 Heaps & Priority Queues</a>
+  <a href="#graphs">05 Graphs</a>
+  <a href="#lru">06 LRU Cache</a>
+  <a href="#drill">07 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="bigo" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Big-O, the Way an Architect Uses It</h2>
+  <div class="tagline">Not proving bounds — reasoning about what breaks first at scale</div>
+
+  <p><b>Define:</b> Big-O describes how an operation's cost grows as input size grows — not the exact speed, just the shape of the curve. <b>O(1)</b> constant, <b>O(log n)</b> logarithmic, <b>O(n)</b> linear, <b>O(n log n)</b> typical good sort, <b>O(n²)</b> nested loops over the same data.</p>
+
+  <div class="analogy"><b>Analogy:</b> Finding a name in a phone book by flipping page by page is O(n) — double the book, double the worst-case time. Finding it by jumping to the middle and halving your search each time (because it's alphabetically sorted) is O(log n) — double the book, and you only need one extra flip. The structure of the data (sorted vs unsorted) is what changes the shape of the curve, not raw effort.</div>
+
+  <div class="block-title">Why it matters at architect level</div>
+  <p>The question is never "what's the Big-O of X" in isolation — it's "this endpoint does an O(n²) operation over a list that's growing 10x a year, when does that become a production incident." An architect's job is spotting that curve before it bites, not reciting complexity classes.</p>
+
+  <div class="block-title">My real example</div>
+  <p>In the sanctions API, comparing an input name against every entry in a watchlist naively is O(n) per screening call — fine at a few thousand entries, a real problem once a watchlist grows to hundreds of thousands. That's exactly the kind of thing that pushes you toward indexing/pre-filtering (e.g. a phonetic key lookup narrowing candidates before the expensive fuzzy comparison runs) rather than a brute-force full scan.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I care about Big-O as an early warning system, not a purity test — the real question I ask is what's the expected data growth over the next 1-2 years, and does today's algorithm's curve stay acceptable at that size. An O(n²) that's fine at 500 records is a production incident at 5 million."</p>
+  </div>
+</section>
+
+<section class="panel" id="hashmap" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Hash Map</h2>
+  <div class="tagline">The structure behind more system design answers than any other</div>
+
+  <p><b>Define:</b> Key-value storage giving average O(1) lookup, insert, and delete by hashing the key to a bucket index. Trade: no ordering guarantee, and worst-case O(n) if hash collisions pile up in one bucket.</p>
+
+  <div class="analogy"><b>Analogy:</b> A hash map is a coat check — you don't search every hook for your coat, the numbered ticket (hash) tells you exactly which hook to go to directly. A poorly-designed hash function is a coat check that sends everyone's coat to hook #7 — now you're searching through a pile at that one hook, back to O(n).</div>
+
+  <div class="block-title">My real example</div>
+  <p>The idempotency check in the message-queue payment flow — "has this transaction ID already been processed?" — is a hash-map-shaped lookup at its core, whether backed by an in-memory cache or a database's indexed unique constraint. O(1) average lookup is exactly what makes that check cheap enough to do on every single message without becoming its own bottleneck.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>You need fast lookup by key and don't care about order — caches, dedup/idempotency checks, counting/frequency problems.</div>
+    <div class="avoid-box"><span class="lbl">Avoid when</span>You need sorted iteration or range queries — a hash map can't efficiently answer "give me everything between X and Y," a tree-based structure can.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Hash maps are my default for anything that's fundamentally 'look this up by key fast' — idempotency checks, caches, dedup. The moment a requirement includes ordering or range queries, that's my signal to reach for a tree-based structure instead."</p>
+  </div>
+</section>
+
+<section class="panel" id="trees" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Trees & Tries</h2>
+  <div class="tagline">When order and hierarchy matter, not just fast lookup</div>
+
+  <div class="block-title">Balanced Binary Search Tree (B-Tree family)</div>
+  <p><b>Define:</b> A sorted structure giving O(log n) search, insert, delete, while keeping data in order — enabling efficient range queries ("all entries between A and M"). <b>My real example:</b> This is essentially what a database index is — B-Trees are the standard structure behind SQL Server/Postgres indexes, which is exactly why an indexed WHERE clause with a range condition is fast, and why range queries on an un-indexed column are a full scan.</p>
+
+  <div class="block-title">Trie (Prefix Tree)</div>
+  <p><b>Define:</b> A tree where each path from the root spells out a prefix — built specifically for fast prefix matching. <b>Analogy:</b> A trie is exactly how a dictionary's thumb-tabs work — jump straight to "S," then "SA," narrowing character by character, instead of scanning every word. <b>Use case:</b> Autocomplete/typeahead search — retrieving all words starting with a given prefix in time proportional to the prefix length, not the size of the whole dataset.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"When I hear 'need to search by prefix, fast, at scale' — autocomplete, typeahead — a trie is the structure purpose-built for that. When I hear 'need range queries on sorted data' — that's exactly what a database B-Tree index already gives me, so I don't need to reinvent it in application code."</p>
+  </div>
+</section>
+
+<section class="panel" id="heaps" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Heaps & Priority Queues</h2>
+  <div class="tagline">Always knowing the "most important" item, without sorting everything</div>
+
+  <p><b>Define:</b> A tree-shaped structure that keeps the minimum (or maximum) element accessible in O(1), with O(log n) insert/remove — without maintaining full sort order of everything else.</p>
+
+  <div class="analogy"><b>Analogy:</b> A hospital ER's triage board doesn't fully sort every patient by severity — it just always knows who's most critical right now, and re-checks that as new patients arrive. That's a heap: cheap to always know "what's most urgent," without paying the cost of a full sort.</div>
+
+  <div class="block-title">My real example / where this shows up in architecture</div>
+  <p>Any "process the most urgent thing next" system is a priority queue under the hood — a job scheduler processing high-priority tasks before low-priority ones, or a rate limiter's token bucket implementation. It's less about writing heap code yourself and more about recognizing when a library's PriorityQueue&lt;T&gt; (or a message broker's priority feature) is the right tool instead of hand-rolling sorting logic.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Whenever a requirement is 'always process the most urgent/smallest/largest item next, and new items keep arriving,' that's a priority queue problem — I'd reach for the built-in PriorityQueue rather than re-sorting a list on every insert, which would be needlessly O(n log n) repeated over and over."</p>
+  </div>
+</section>
+
+<section class="panel" id="graphs" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Graphs</h2>
+  <div class="tagline">Anything with relationships between things — not just "social network" interview clichés</div>
+
+  <p><b>Define:</b> Nodes connected by edges, representing relationships. <b>BFS</b> (breadth-first) explores level by level — good for shortest path in unweighted graphs. <b>DFS</b> (depth-first) explores as deep as possible before backtracking — good for detecting cycles, exploring all paths.</p>
+
+  <div class="analogy"><b>Analogy:</b> BFS is how ripples spread across a pond from a dropped stone — everything at distance 1 first, then distance 2. DFS is exploring a maze by always taking the next available turn and only backtracking when you hit a dead end.</div>
+
+  <div class="block-title">Where this actually shows up architecturally</div>
+  <ul style="font-size:14.5px;">
+    <li><b>Service dependency graphs</b> — detecting circular dependencies between microservices is a cycle-detection problem (DFS-based).</li>
+    <li><b>Build/task ordering</b> — resolving "run these steps in an order that respects dependencies" is <b>topological sort</b>, a graph algorithm — exactly what a CI/CD pipeline or a Terraform dependency graph resolves under the hood.</li>
+    <li><b>Recommendation/permission systems</b> — "what can this role reach, transitively" is a graph traversal question.</li>
+  </ul>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I don't think of graphs as an interview-only topic — a microservices dependency map is a graph, and a circular dependency between services is literally a cycle in that graph, detectable the same way you'd detect a cycle in any directed graph."</p>
+  </div>
+</section>
+
+<section class="panel" id="lru" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>LRU Cache — The Classic Combination Problem</h2>
+  <div class="tagline">Why this specific question gets asked so often: it combines two structures on purpose</div>
+
+  <p><b>Define:</b> A cache with a fixed capacity that evicts the Least Recently Used item when full. Implemented by combining a <b>hash map</b> (O(1) lookup by key) with a <b>doubly linked list</b> (O(1) move-to-front on access, O(1) remove-from-tail on eviction) — neither structure alone gives you both O(1) lookup AND O(1) recency tracking.</p>
+
+  <div class="analogy"><b>Analogy:</b> A stack of recently-worn clothes on a chair, plus a mental note of exactly where in the pile each item is. Wearing something moves it to the top of the pile (recency) instantly, but you also instantly know exactly where any specific item is in the pile (the hash map) rather than digging through it.</div>
+
+  <div class="block-title">Why it's a favorite interview question</div>
+  <p>It's not really about either structure alone — it tests whether you recognize that combining two structures can satisfy two different requirements that neither one meets by itself. That combination instinct is the actual architect-level skill being probed, more than the specific data structure names.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"LRU cache is really a lesson in combining structures — hash map alone gives me fast lookup but no cheap way to track recency; a linked list alone gives me cheap recency tracking but O(n) lookup. Combining them gets O(1) on both operations, which is the pattern I look for generally: what does neither single structure give me alone?"</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Need O(1) average lookup by key, don't care about order?</div><div class="a">Hash map.</div></div>
+    <div class="qa-item"><div class="q">Need fast range queries on sorted data?</div><div class="a">Balanced BST / B-Tree — this is what a database index actually is under the hood.</div></div>
+    <div class="qa-item"><div class="q">Need fast prefix search (autocomplete)?</div><div class="a">Trie.</div></div>
+    <div class="qa-item"><div class="q">Need to always process the most urgent item next, as new items arrive?</div><div class="a">Heap / priority queue.</div></div>
+    <div class="qa-item"><div class="q">Detecting a circular dependency between microservices?</div><div class="a">Cycle detection on a directed graph (DFS-based).</div></div>
+    <div class="qa-item"><div class="q">Why does LRU cache need two structures, not one?</div><div class="a">Hash map alone lacks cheap recency tracking; linked list alone lacks fast lookup — combining gives O(1) on both.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 13 — DATA STRUCTURES & COMPLEXITY · Interview Prep Series</footer>
+</body>
+</html>
