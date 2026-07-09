@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distributed Systems Theory — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 14 / Foundations</div>
+  <h1>Distributed Systems Theory</h1>
+  <p>CAP theorem, consistency models, and consensus — the theory underneath every "why did you choose this database / this architecture" question you've already been answering practically throughout this whole prep site.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#cap">01 CAP Theorem</a>
+  <a href="#consistency">02 Consistency Models</a>
+  <a href="#consensus">03 Consensus (Raft/Paxos)</a>
+  <a href="#clocks">04 Clocks & Ordering</a>
+  <a href="#drill">05 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="cap" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>CAP Theorem</h2>
+  <div class="tagline">Pick two of three — but the real skill is knowing which two, when</div>
+
+  <p><b>Define:</b> In a distributed system, when a network partition happens (and it eventually will), you must choose between <b>Consistency</b> (every node sees the same data at the same time) and <b>Availability</b> (every request gets a response, even if it might be stale). You can't have both during a partition — Partition tolerance itself isn't really optional in a real distributed system, so CAP in practice is a <b>CP vs AP</b> choice.</p>
+
+  <div class="analogy"><b>Analogy:</b> Two bank branches in different cities, phone lines suddenly cut between them (a partition). If both branches keep serving customers independently (Available), they might approve two withdrawals from the same account that together overdraw it — a consistency problem. If instead they refuse to process any withdrawal until the phone line is back (Consistent), some customers get turned away entirely during the outage — an availability problem. You cannot have both while the line is down.</div>
+
+  <div class="block-title">Why it exists / why it's not academic trivia</div>
+  <p>This is the theoretical backbone behind a real architectural decision you make constantly: pick a strongly consistent database (most relational DBs, configured that way) when correctness matters more than uptime during a partition — payments, inventory counts. Pick an eventually-consistent store (DynamoDB default, Cassandra, many caches) when staying available matters more, and briefly stale data is an acceptable trade — product catalogs, social feeds, view counts.</p>
+
+  <div class="block-title">My real example</div>
+  <p>The payment transaction flow I walked through in the Message Queues page is a CP decision, deliberately — the idempotency check and FIFO ordering exist specifically because staleness or a dropped/duplicated update would mean a wrong charge, which is unacceptable. A "likes count" on a social post, by contrast, is a textbook AP case — showing a count that's a few seconds stale is a completely acceptable trade for never showing an error to the user.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Choose CP when</span>Correctness violations are costly or dangerous — financial transactions, inventory/stock levels, anything where "briefly wrong" causes real damage.</div>
+    <div class="avoid-box"><span class="lbl">Choose AP when</span>Staying responsive matters more than momentary staleness — feeds, counters, recommendations, most read-heavy consumer-facing data.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat CAP as CP-vs-AP in practice, since partition tolerance isn't really optional at scale — and I decide per data type, not per whole system. A single application often has both: strongly consistent for the payment ledger, eventually consistent for the activity feed, in the same product."</p>
+  </div>
+</section>
+
+<section class="panel" id="consistency" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Consistency Models</h2>
+  <div class="tagline">"Eventually consistent" isn't one thing — there's a real spectrum</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Strong Consistency</span>Every read sees the latest write, immediately, everywhere. Simplest to reason about, most expensive to provide across a distributed system (usually requires coordination/consensus on every write).</div>
+    <div class="avoid-box"><span class="lbl">Eventual Consistency</span>Given no new writes, all nodes will converge to the same value — eventually, with no bound on exactly when. Cheap and highly available, but callers must tolerate temporarily seeing stale data.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Read-Your-Writes Consistency</span>A middle ground — a specific user is always guaranteed to see their own writes immediately, even if other users might briefly see stale data. Common pattern: route a user's reads to the same replica their write went to, or add a short client-side cache of their own recent write.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> Posting a comment on a social app and immediately seeing it yourself (read-your-writes) while a friend across the world might not see it for another second or two (eventual consistency for everyone else) is the exact pattern most consumer apps actually ship — not pure strong consistency, not pure "anyone might see anything at any time" eventual consistency, but this specific middle guarantee.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"'Eventually consistent' alone is often too vague a requirement to design against — I'd push to clarify whether the real need is full strong consistency, or actually just read-your-writes, which is much cheaper to provide and satisfies most user-facing 'why don't I see my own change' complaints without needing full cross-replica strong consistency."</p>
+  </div>
+</section>
+
+<section class="panel" id="consensus" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Consensus — Raft & Paxos, Conceptually</h2>
+  <div class="tagline">How a cluster of nodes agrees on one true value despite failures — you won't implement this, but you'll use systems built on it constantly</div>
+
+  <p><b>Define:</b> A consensus algorithm lets a cluster of nodes agree on a single value (or an ordered log of values) even if some nodes crash or messages are delayed — critical for anything requiring one authoritative answer despite no single node being fully trustworthy alone.</p>
+
+  <div class="analogy"><b>Analogy:</b> A jury reaching a unanimous verdict despite some jurors being temporarily out of the room, some hearing testimony slightly out of order, and needing a process (a foreman, a structured vote) that still produces one agreed answer everyone trusts — even though no single juror's opinion alone decides it.</div>
+
+  <div class="block-title">Raft, at the level worth knowing</div>
+  <p>Raft elects a single <b>leader</b> among the nodes; all writes go through the leader, which replicates them to followers and only considers a write committed once a majority of nodes have acknowledged it. If the leader dies, the cluster detects it (missed heartbeats) and elects a new leader. The "majority" requirement is what prevents two different leaders from both thinking they're in charge during a network split.</p>
+
+  <div class="block-title">Where this actually shows up in your daily work</div>
+  <p>You almost never implement Raft/Paxos yourself — but you constantly rely on systems that do: etcd (which Kubernetes' control plane is built on), ZooKeeper, Kafka's controller election, and many managed database replication setups all use a consensus protocol under the hood to agree on cluster state and leadership.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I don't need to implement Raft, but I recognize it's running underneath things I use constantly — etcd behind Kubernetes' control plane is the clearest example. The concept I'd actually apply day to day is the majority-quorum idea: needing more than half the nodes to agree before a write is considered durable, which is exactly why odd-numbered cluster sizes (3, 5) are the norm — a 4-node cluster gives you no better fault tolerance than 3, just a more expensive quorum."</p>
+  </div>
+</section>
+
+<section class="panel" id="clocks" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Clocks & Ordering</h2>
+  <div class="tagline">Why "just use a timestamp" doesn't reliably order events across machines</div>
+
+  <p><b>Define:</b> Physical clocks on different machines drift and are never perfectly synchronized — so comparing timestamps from two different nodes to determine "which event happened first" is unreliable, sometimes by tens or hundreds of milliseconds. <b>Logical clocks</b> (Lamport timestamps, vector clocks) track relative ordering of events based on causality (did event A actually happen-before event B, via a chain of messages) rather than trusting wall-clock time across machines.</p>
+
+  <div class="analogy"><b>Analogy:</b> Two people in different time zones both writing "just now" in a shared diary — the literal wall-clock timestamps might even claim one happened before the other due to clock drift, even if you know from context which one actually triggered the other. Logical clocks track "this caused that," not "the wall clock said X."</div>
+
+  <div class="block-title">Where this matters practically</div>
+  <p>This is exactly why message queue ordering (covered in the Message Queues page) is scoped structurally — via FIFO message groups or partition keys — rather than by comparing embedded timestamps after the fact. It's also why distributed tracing systems (Jaeger, X-Ray) use causally-linked span IDs to reconstruct request flow, not just timestamp sorting, since clock drift across services would otherwise scramble the picture.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I don't trust cross-machine timestamps for ordering — clock drift is real and can be larger than the gap between the events you're trying to order. When ordering matters, I design it structurally, like a FIFO queue's message group, rather than reconstructing it after the fact from timestamps."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">CAP theorem, in one line?</div><div class="a">During a network partition, you must choose Consistency or Availability — partition tolerance itself isn't optional, so it's really a CP-vs-AP decision.</div></div>
+    <div class="qa-item"><div class="q">Payment ledger — CP or AP?</div><div class="a">CP — a stale or dropped update is unacceptable; correctness beats availability here.</div></div>
+    <div class="qa-item"><div class="q">"I don't see my own comment I just posted" — what consistency guarantee is missing?</div><div class="a">Read-your-writes consistency — often the actual requirement, cheaper than full strong consistency.</div></div>
+    <div class="qa-item"><div class="q">Why 3 or 5 node clusters, not 4?</div><div class="a">Quorum-based consensus needs a majority — a 4-node cluster tolerates the same 1 failure as a 3-node cluster, just at higher cost, so odd numbers are the efficient choice.</div></div>
+    <div class="qa-item"><div class="q">What runs on Raft that you use constantly without knowing it?</div><div class="a">etcd — which Kubernetes' entire control plane state is built on.</div></div>
+    <div class="qa-item"><div class="q">Why not just compare timestamps to order events across two machines?</div><div class="a">Clock drift between machines can exceed the actual gap between events — order should be established structurally (causal/logical ordering), not from wall-clock comparison.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 14 — DISTRIBUTED SYSTEMS THEORY · Interview Prep Series</footer>
+</body>
+</html>
