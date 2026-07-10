@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resilience Patterns — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 15 / System Design</div>
+  <h1>Resilience Patterns</h1>
+  <p>Circuit breaker, retry with backoff, bulkhead, rate limiting — how you stop one failing dependency from taking down everything connected to it. Polly is the .NET library that implements most of these directly.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#retry">01 Retry & Backoff</a>
+  <a href="#circuitbreaker">02 Circuit Breaker</a>
+  <a href="#bulkhead">03 Bulkhead</a>
+  <a href="#ratelimit">04 Rate Limiting</a>
+  <a href="#timeout">05 Timeouts</a>
+  <a href="#combining">06 Combining Patterns</a>
+  <a href="#drill">07 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="retry" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Retry with Exponential Backoff</h2>
+  <div class="tagline">Trying again is fine — trying again immediately and repeatedly is how you cause an outage</div>
+
+  <p><b>Define:</b> On a failed call, retry after a delay — and increase that delay exponentially with each subsequent failure (1s, 2s, 4s, 8s...), usually with <b>jitter</b> (random variation) added so many clients don't retry in perfect lockstep.</p>
+
+  <div class="analogy"><b>Analogy:</b> If a shop's phone line is busy, calling back immediately and repeatedly (naive retry) just adds you to an ever-growing pile of callers all hammering the same busy line. Waiting a bit longer each time you get busy signal, and not calling at exactly the same second as everyone else doing the same thing (jitter), gives the line an actual chance to clear.</div>
+
+  <div class="block-title">Why it exists — the failure mode without it</div>
+  <p>A dependency that's struggling under load gets retried immediately by every failed caller — which adds more load to an already-struggling system, making recovery less likely, not more. This is called a <b>retry storm</b>, and it's one of the most common ways a small blip becomes a full outage.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Retry safely when</span>The operation is idempotent (same idempotency discipline as the Message Queues page) — retrying a duplicate GET or a properly idempotent POST is safe.</div>
+    <div class="avoid-box"><span class="lbl">Don't blindly retry when</span>The operation isn't idempotent, or the failure is a client error (4xx) rather than a transient one (5xx/timeout) — retrying a guaranteed-to-fail request just wastes calls.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Retry without backoff and jitter is how you turn a brief blip into an outage — every failed caller hammering the dependency at the same instant, repeatedly. I always pair retry with exponential backoff plus jitter, and I only retry operations I know are idempotent."</p>
+  </div>
+</section>
+
+<section class="panel" id="circuitbreaker" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Circuit Breaker</h2>
+  <div class="tagline">Stop calling a dependency that's clearly down, instead of hammering it while it tries to recover</div>
+
+  <p><b>Define:</b> Tracks failures to a dependency; once failures cross a threshold, the circuit "opens" — further calls fail immediately (fast) without even attempting the network call, for a cooldown period. After the cooldown, it goes "half-open," letting a small number of test calls through to check if the dependency has recovered before fully closing again.</p>
+
+  <div class="analogy"><b>Analogy:</b> This is literally named after an electrical circuit breaker — when there's a fault (a short), the breaker trips and cuts power immediately, rather than letting current keep flowing into a damaged circuit and making things worse. You don't keep flipping the switch back on rapidly; you wait, then carefully test it once.</div>
+
+  <div class="block-title">Why it exists, on top of retry</div>
+  <p>Retry handles brief, one-off blips well — but if a dependency is genuinely down for an extended period, retrying every single call (even with backoff) still means every caller keeps waiting out a full timeout on every request. A circuit breaker fails fast once it's confident the dependency is down, saving both the caller's latency and the dependency's recovery time.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>Calling an external dependency that can genuinely be down for extended periods — protects both your own latency and gives the failing dependency room to recover.</div>
+    <div class="avoid-box"><span class="lbl">Design carefully</span>The open-circuit fallback behavior matters as much as the breaker itself — what do you return to the caller while open? A cached last-good value, a degraded response, or a clear error — silently failing is worse than the outage itself.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Retry and circuit breaker solve related but different problems — retry assumes the failure is brief and worth waiting out; circuit breaker assumes it might not be, and stops making things worse by failing fast. I'd use them together: retry with backoff for transient blips, wrapped by a circuit breaker for sustained outages."</p>
+  </div>
+</section>
+
+<section class="panel" id="bulkhead" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Bulkhead</h2>
+  <div class="tagline">Isolate resource pools so one slow dependency can't starve everything else</div>
+
+  <p><b>Define:</b> Named after a ship's bulkheads — physical compartments that stop one flooded section from sinking the entire vessel. In software: isolate resource pools (thread pools, connection pools) per dependency, so a slow or failing one can't exhaust resources needed by unrelated calls.</p>
+
+  <div class="analogy"><b>Analogy:</b> A restaurant kitchen with one shared pool of chefs, where a single slow, complicated order (a struggling dependency) ties up every chef, leaving no one free to make the simple, fast orders that would otherwise go out in two minutes. Giving that complicated dish its own dedicated chef (a separate resource pool) means the rest of the kitchen keeps moving regardless of how long that one dish takes.</div>
+
+  <div class="block-title">Why it exists — the failure mode without it</div>
+  <p>Without isolation, a single slow downstream call (all threads in a shared pool blocked waiting on it) can exhaust the entire thread pool — meaning completely unrelated, healthy requests to fast dependencies also start failing, purely because there are no threads left to serve them. This is how one degraded dependency cascades into a total outage of an otherwise-healthy service.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use when</span>A service calls multiple downstream dependencies with meaningfully different reliability/latency profiles — isolate the risky ones.</div>
+    <div class="avoid-box"><span class="lbl">Cost</span>More resource pools to size and monitor — over-isolating everything adds operational overhead without proportional benefit for genuinely low-risk, fast dependencies.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The failure mode bulkheading prevents is resource starvation cascading — one slow dependency consuming every thread in a shared pool, taking down calls to completely unrelated, healthy dependencies. I'd isolate the pool specifically for whichever dependency has the worst reliability track record, not necessarily every single one."</p>
+  </div>
+</section>
+
+<section class="panel" id="ratelimit" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rate Limiting</h2>
+  <div class="tagline">Protecting yourself from too much traffic, not just protecting others from too little</div>
+
+  <div class="block-title">Token Bucket (most common)</div>
+  <p><b>Define:</b> A bucket holds tokens, refilled at a fixed rate. Each request consumes a token; if the bucket's empty, the request is rejected or queued. Naturally allows short bursts (using saved-up tokens) while enforcing a steady average rate over time.</p>
+
+  <div class="analogy"><b>Analogy:</b> A theme park ride handing out a fixed number of boarding tokens per hour, refilled steadily — you can use a batch of saved tokens to bring a big group all at once (a burst), but you can't exceed the park's overall hourly throughput on average.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>Protects a service from being overwhelmed (by a traffic spike, a buggy client in a retry loop, or a malicious actor) and enforces fair usage across multiple consumers of a shared API — the same instinct behind APIM/API Gateway throttling covered in the Azure and Kubernetes pages.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Token bucket when</span>Bursty traffic is normal and acceptable, as long as the average stays bounded — most public APIs.</div>
+    <div class="avoid-box"><span class="lbl">Fixed window / sliding window when</span>You need simpler, more predictable enforcement and can accept less burst tolerance — easier to reason about but can allow a "double burst" right at a window boundary in the naive fixed-window version.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Token bucket is my default because real traffic is naturally bursty, and it's the only common approach that cleanly allows short bursts while still enforcing a real average rate — I'd only reach for a simpler fixed-window limiter when the traffic pattern genuinely doesn't need burst tolerance."</p>
+  </div>
+</section>
+
+<section class="panel" id="timeout" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Timeouts</h2>
+  <div class="tagline">The simplest pattern here, and the one most often skipped entirely</div>
+
+  <p><b>Define:</b> An explicit maximum wait time on any network call — after which you give up and treat it as a failure, rather than waiting indefinitely.</p>
+
+  <div class="block-title">Why it's foundational</div>
+  <p>Without a timeout, a single hung dependency call can block a thread forever — and enough of those hung calls exhausts a thread pool exactly like the bulkhead failure mode described above, except with no dependency isolation even helping, because the pool itself never frees up. Every one of the other patterns on this page assumes a timeout exists somewhere underneath it — retry needs a bounded call to know when to retry; a circuit breaker needs bounded calls to count failures accurately.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Timeouts are the pattern everything else here is built on top of — without a bounded call, retry has nothing to retry against, and a circuit breaker can't reliably count failures. It's the simplest pattern on this page and also the one I see missing most often in real codebases."</p>
+  </div>
+</section>
+
+<section class="panel" id="combining" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Combining Patterns — the Real Interview Question</h2>
+  <div class="tagline">A senior answer names the layering, not just one pattern in isolation</div>
+
+  <p>These patterns aren't alternatives to each other — a well-protected call to an external dependency typically layers several: a <b>timeout</b> bounding each individual call attempt, wrapped in <b>retry with exponential backoff</b> for transient failures, wrapped in a <b>circuit breaker</b> that stops retrying entirely once it's confident the dependency is down, running inside a <b>bulkhead</b>-isolated resource pool so this one dependency can't starve unrelated calls, with a <b>rate limiter</b> protecting the calling service itself from being overwhelmed by its own upstream traffic.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I think of these as layers, not choices — timeout bounds each attempt, retry handles brief blips, circuit breaker handles sustained outages, bulkhead stops one dependency's problems from spreading to others, and rate limiting protects the service itself from its own inbound load. In .NET, Polly implements most of this directly as composable policies, which is exactly the layered structure I'd reach for rather than hand-rolling each one."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What's a retry storm, and how do you prevent it?</div><div class="a">Every failed caller retrying immediately, adding load to an already-struggling dependency — prevented with exponential backoff plus jitter.</div></div>
+    <div class="qa-item"><div class="q">How is a circuit breaker different from retry?</div><div class="a">Retry assumes the failure is brief; circuit breaker assumes it might be sustained, and fails fast without even attempting the call once it's confident the dependency is down.</div></div>
+    <div class="qa-item"><div class="q">What failure mode does a bulkhead prevent?</div><div class="a">One slow dependency exhausting a shared thread/connection pool, starving unrelated healthy calls of resources.</div></div>
+    <div class="qa-item"><div class="q">Why token bucket over a simple fixed-window rate limiter?</div><div class="a">Naturally tolerates bursts while still enforcing an average rate — fixed window can allow a double-burst right at the window boundary.</div></div>
+    <div class="qa-item"><div class="q">Which pattern is everything else built on top of?</div><div class="a">Timeouts — retry and circuit breakers both need a bounded call underneath them to function correctly.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 15 — RESILIENCE PATTERNS · Interview Prep Series</footer>
+</body>
+</html>
