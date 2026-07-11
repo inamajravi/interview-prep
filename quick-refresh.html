@@ -71,6 +71,8 @@
 
 <nav>
   <a href="#story">Your Story</a>
+  <a href="#datastructures">Data Structures</a>
+  <a href="#distributed">Distributed Systems</a>
   <a href="#patterns">Patterns</a>
   <a href="#architecture">Architecture</a>
   <a href="#dotnetspring">.NET / Spring</a>
@@ -80,6 +82,8 @@
   <a href="#ai">Agentic AI</a>
   <a href="#mq">Message Queues</a>
   <a href="#k8s">Kubernetes</a>
+  <a href="#resilience">Resilience</a>
+  <a href="#security">Security</a>
   <a href="#checklist">Final Checklist</a>
 </nav>
 
@@ -88,6 +92,31 @@
 <div class="story-box" id="story">
   <span class="lbl">Say this first, if you get the opening</span>
   <p>"I built a production sanctions screening API — architect and reviewer role, AI handled implementation. Weighted multi-algorithm matching (fuzzy, phonetic, Levenshtein) across OFAC SDN, OFAC Non-SDN, and UN watchlists, config-driven so a new source doesn't touch the core engine. I made the design calls, caught the issues, drove the direction."</p>
+</div>
+
+<div class="mini-panel" id="datastructures">
+  <h3><span class="n">00a</span> Data Structures & Complexity</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Big-O</b>Early warning system — what breaks first as data grows, not a purity test.</div>
+    <div class="chip"><b>Hash map</b>O(1) lookup by key — my default for caches, dedup, idempotency checks.</div>
+    <div class="chip"><b>Tree/B-Tree</b>Sorted + range queries — literally what a DB index is under the hood.</div>
+    <div class="chip"><b>Trie</b>Fast prefix search — autocomplete/typeahead.</div>
+    <div class="chip"><b>Heap</b>Always know the most urgent item without a full sort.</div>
+    <div class="chip"><b>Graph</b>Circular service dependencies = cycle detection; CI/CD ordering = topological sort.</div>
+    <div class="chip"><b>LRU cache</b>Hash map + linked list combined — neither alone gives O(1) on both lookup and recency.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="distributed">
+  <h3><span class="n">00b</span> Distributed Systems Theory</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>CAP</b>Really CP vs AP — partition tolerance isn't optional. Decide per data type, not per system.</div>
+    <div class="chip"><b>Payments</b>CP — correctness over uptime.</div>
+    <div class="chip"><b>Feeds/counters</b>AP — brief staleness is fine.</div>
+    <div class="chip"><b>Read-your-writes</b>Often the real requirement, cheaper than full strong consistency.</div>
+    <div class="chip"><b>Consensus/Raft</b>Majority quorum — why clusters are 3 or 5 nodes, not 4.</div>
+    <div class="chip"><b>Clock drift</b>Don't trust cross-machine timestamps for ordering — design it structurally instead.</div>
+  </div>
 </div>
 
 <div class="mini-panel" id="patterns">
@@ -201,6 +230,30 @@
     <div class="chip"><b>Ingress</b>One entry point, path/host routing — cheaper than a LoadBalancer per service.</div>
     <div class="chip"><b>Canary</b>Lowest blast radius for a risky release — small % of traffic first.</div>
     <div class="chip"><b>StatefulSet</b>Stable identity + per-Pod storage — but managed DB is often preferred over running one in-cluster.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="resilience">
+  <h3><span class="n">10</span> Resilience Patterns</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Retry storm</b>Fix with exponential backoff + jitter — only retry idempotent operations.</div>
+    <div class="chip"><b>Circuit breaker</b>Fail fast once confident a dependency is down — vs retry's "assume it's brief."</div>
+    <div class="chip"><b>Bulkhead</b>Isolate resource pools per dependency — stops one slow call from starving everything.</div>
+    <div class="chip"><b>Token bucket</b>Rate limiting that tolerates bursts while enforcing an average rate.</div>
+    <div class="chip"><b>Timeouts</b>The pattern everything else is built on — retry/circuit breaker need bounded calls.</div>
+    <div class="chip"><b>Layer them</b>Timeout → retry → circuit breaker → bulkhead → rate limit. Polly implements this in .NET.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="security">
+  <h3><span class="n">11</span> Security</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>OAuth2 vs OIDC</b>Authorization (can this app do X) vs authentication (who is this user).</div>
+    <div class="chip"><b>JWT</b>Signed, NOT encrypted — payload is readable by anyone holding it. Never put secrets in it.</div>
+    <div class="chip"><b>JWT revocation</b>Hard before expiry by design — stateless is the whole point.</div>
+    <div class="chip"><b>TLS ≠ encryption at rest</b>Two separate requirements — TLS covers network only.</div>
+    <div class="chip"><b>Broken Access Control</b>Most common real OWASP issue — auth is remembered, per-resource authz is forgotten.</div>
+    <div class="chip"><b>Zero Trust</b>No implicit trust from network location — every call, internal or external, authenticates.</div>
   </div>
 </div>
 

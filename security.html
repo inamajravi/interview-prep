@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 16 / Operational</div>
+  <h1>Security for Architects</h1>
+  <p>OAuth2/OIDC, JWTs, encryption, and the OWASP Top 10 basics — pitched at "what would you design into the system," not a pentester's toolkit.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#oauth">01 OAuth2 vs OIDC</a>
+  <a href="#jwt">02 JWT Internals</a>
+  <a href="#encryption">03 Encryption</a>
+  <a href="#owasp">04 OWASP Top 10 Essentials</a>
+  <a href="#zerotrust">05 Zero Trust</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="oauth" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>OAuth2 vs OIDC</h2>
+  <div class="tagline">Authorization vs authentication — a distinction almost everyone blurs, including in interviews</div>
+
+  <p><b>Define:</b> <b>OAuth2</b> is an <i>authorization</i> framework — it lets an app get limited access to a resource on a user's behalf, without ever seeing their password ("let this app read my Google Calendar"). <b>OIDC (OpenID Connect)</b> is a thin identity layer built <i>on top of</i> OAuth2, adding actual <i>authentication</i> — proving who the user is, via a standardized ID Token.</p>
+
+  <div class="analogy"><b>Analogy:</b> OAuth2 alone is a hotel key card scoped to specific rooms — it proves you're allowed into the gym and the pool, but it doesn't actually identify who you are, just that you were granted access. OIDC adds a photo ID check on top — now the hotel also knows and can verify exactly who's holding that card.</div>
+
+  <div class="block-title">Why the distinction matters</div>
+  <p>A very common mistake: using a plain OAuth2 access token to identify a user ("this token exists, so someone's logged in") when OAuth2 was never designed to guarantee that — access tokens are opaque authorization grants, not identity proofs. OIDC's ID Token is the piece specifically designed and signed for identity verification.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use OAuth2 alone when</span>You genuinely only need delegated access to a resource, with no need to know or verify who the user actually is.</div>
+    <div class="avoid-box"><span class="lbl">Use OIDC when</span>You need actual "who is this user" login — which is nearly every consumer-facing "Sign in with Google/Microsoft" flow, even though people often just say "OAuth login" loosely.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'm precise about this distinction because it's a real source of bugs — OAuth2 answers 'is this app allowed to do X,' OIDC answers 'who is this person.' If a login flow is built on bare OAuth2 access tokens without OIDC's ID token, you don't actually have verified identity, just a valid-looking access grant."</p>
+  </div>
+</section>
+
+<section class="panel" id="jwt" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>JWT Internals</h2>
+  <div class="tagline">Signed, not encrypted — the single most important thing to know about a JWT</div>
+
+  <p><b>Define:</b> A JSON Web Token has three parts — header.payload.signature — base64url-encoded and concatenated. The signature proves the token wasn't tampered with since issuance, verified with a secret (HMAC) or a public/private key pair (RSA/ECDSA).</p>
+
+  <div class="block-title">The critical misconception</div>
+  <div class="avoid-box"><span class="lbl">JWTs are signed, NOT encrypted by default</span>The payload is just base64-encoded — trivially readable by anyone, including the end user holding it. Never put sensitive data (passwords, SSNs, secrets) directly in a standard JWT payload. If you truly need the payload itself hidden, that requires a separate encryption step (JWE), which is uncommon in practice — the standard pattern is simply "don't put secrets in the payload," not "encrypt the JWT."</div>
+
+  <div class="analogy"><b>Analogy:</b> A JWT is like a sealed wax-stamped letter with the contents printed in clear, large text visible through the envelope — the wax seal (signature) proves nobody tampered with the letter after it was sealed, but it does nothing to hide what's written inside. Anyone holding the letter can read every word.</div>
+
+  <div class="block-title">Trade-off — JWT vs opaque session tokens</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">JWT (stateless)</span>Self-contained — any service holding the public key can verify it without a database lookup, great for distributed/microservices auth. Downside: hard to revoke before expiry, since there's no central "is this still valid" check by default.</div>
+    <div class="avoid-box"><span class="lbl">Opaque session token</span>Just a random ID, looked up against a server-side store on every request — trivially revocable (delete the server-side record), but requires that lookup on every request, and doesn't scale as cleanly across independent services without a shared session store.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The thing I always flag about JWTs is that they're signed, not encrypted — the payload is readable by anyone holding the token, so nothing sensitive belongs in it. The revocation trade-off is the other big one: JWTs are great for stateless, distributed verification, but genuinely hard to revoke before expiry without adding back some form of server-side check, which partially undoes the statelessness benefit."</p>
+  </div>
+</section>
+
+<section class="panel" id="encryption" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Encryption — At Rest & In Transit</h2>
+  <div class="tagline">Two different protections, addressing two different threats</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Encryption in transit (TLS)</span>Protects data while it's moving across a network — prevents an attacker on the network path from reading or tampering with it. This is what HTTPS provides.</div>
+    <div class="avoid-box"><span class="lbl">Encryption at rest</span>Protects data while it's stored — on disk, in a database, in a backup. Protects against a stolen disk, an unauthorized database dump, or a misconfigured backup exposure. TLS alone does nothing for this — data can be perfectly protected in transit and still sit as cleartext once it lands on disk.</div>
+  </div>
+
+  <div class="block-title">Symmetric vs Asymmetric — the practical distinction</div>
+  <p><b>Symmetric</b> (AES): one shared key encrypts and decrypts — fast, used for the bulk of actual data encryption. <b>Asymmetric</b> (RSA/ECDSA): public key encrypts (or verifies), private key decrypts (or signs) — slower, but solves the "how do two parties who've never met securely share a key" problem. In practice, TLS uses asymmetric crypto briefly during the handshake specifically to safely exchange a symmetric session key, then switches to fast symmetric encryption for the actual data — combining both for the reason each is good at.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat encryption in transit and at rest as two separate requirements, not one checkbox — TLS covers the network, but if the database itself is compromised or a backup leaks, encryption at rest is what actually protects the data. I'd expect both, by default, on anything handling sensitive data — not one as a substitute for the other."</p>
+  </div>
+</section>
+
+<section class="panel" id="owasp" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>OWASP Top 10 — the Ones Worth Knowing Cold</h2>
+  <div class="tagline">Not memorizing all 10 by number — knowing the two or three that come up constantly</div>
+
+  <div class="block-title">Injection (SQL Injection)</div>
+  <p><b>Define:</b> Untrusted input concatenated directly into a query lets an attacker alter the query's logic. <b>Fix:</b> Parameterized queries / prepared statements — always, no exceptions — which both EF Core and JPA/Hibernate do by default when you use them correctly, meaning most modern ORM usage is already protected unless someone drops to raw string-concatenated SQL.</p>
+
+  <div class="block-title">Broken Access Control</div>
+  <p><b>Define:</b> The system correctly identifies who a user is, but fails to properly check what they're allowed to do — e.g. an API that checks a JWT is valid but never checks whether <i>this specific user</i> is allowed to access <i>this specific resource</i> (an "insecure direct object reference" — changing an ID in a URL to access someone else's data). Consistently ranked as one of the most common real-world vulnerabilities, precisely because authentication is easy to remember and authorization-per-resource is easy to forget.</p>
+
+  <div class="block-title">Cross-Site Scripting (XSS)</div>
+  <p><b>Define:</b> Untrusted input rendered into a page as if it were trusted HTML/JS, letting an attacker run script in another user's browser session. <b>Fix:</b> Output encoding/escaping by default — modern frameworks like Angular and React escape by default, which is exactly why bypassing that default (Angular's <code>[innerHTML]</code>/<code>bypassSecurityTrust*</code>, React's <code>dangerouslySetInnerHTML</code>) is a real red flag worth scrutinizing in code review.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Rather than reciting all 10 by number, I'd flag Broken Access Control as the one I actually see most in practice — teams get authentication right (is this a valid user) and then forget the second check (is this valid user allowed to touch this specific resource). That gap is usually where real vulnerabilities live, more than exotic injection attacks against a modern ORM."</p>
+  </div>
+</section>
+
+<section class="panel" id="zerotrust" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Zero Trust</h2>
+  <div class="tagline">Stop assuming anything inside your network perimeter is automatically safe</div>
+
+  <p><b>Define:</b> A security model that assumes no implicit trust based on network location — every request is authenticated and authorized, whether it originates from outside the network or from another service sitting right next to it inside the same data center. Contrasts with the older "castle and moat" model, where anything inside the firewall was implicitly trusted.</p>
+
+  <div class="analogy"><b>Analogy:</b> A castle-and-moat model trusts anyone who's already inside the castle walls, no further questions asked. Zero trust is more like a modern office building where your badge is checked at every single door — the lobby, the elevator, your floor, even a meeting room — not just once at the front entrance, because someone getting past the front door doesn't mean they should have access to everything behind it.</div>
+
+  <div class="block-title">Why it exists</div>
+  <p>The perimeter model breaks down once you have microservices, cloud infrastructure, and remote work — there often isn't one clear "inside the firewall" anymore, and a single compromised internal service or credential in a perimeter model can move laterally with little friction. Zero trust assumes breach is possible anywhere and checks identity/authorization at every hop.</p>
+
+  <div class="block-title">My real example — where this connects to what I already do</div>
+  <p>Requiring every microservice-to-microservice call to carry and validate its own auth token — rather than trusting "it's an internal call, it must be fine" — is zero trust applied practically, and it's the same instinct behind APIM/API Gateway enforcing auth centrally rather than assuming internal traffic is automatically safe.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Zero trust is really just extending the same authorization discipline you'd apply to external traffic to internal service-to-service calls too — not assuming 'it's coming from inside our network, so it's fine.' At a practical level, that means every service call carries and validates its own credentials, not just the request that first entered the system."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">OAuth2 vs OIDC, in one line?</div><div class="a">OAuth2 = authorization (can this app do X); OIDC = authentication (who is this user), built on top of OAuth2.</div></div>
+    <div class="qa-item"><div class="q">Is a JWT payload encrypted?</div><div class="a">No — signed, not encrypted. Base64-encoded and readable by anyone holding it; never put secrets in the payload.</div></div>
+    <div class="qa-item"><div class="q">Why can't you easily revoke a JWT before expiry?</div><div class="a">It's self-contained/stateless by design — no central "is this still valid" check unless you deliberately add one back, which partially undoes the statelessness benefit.</div></div>
+    <div class="qa-item"><div class="q">Does TLS protect data sitting in a database?</div><div class="a">No — TLS covers data in transit only; encryption at rest is a separate requirement for data on disk/in backups.</div></div>
+    <div class="qa-item"><div class="q">Most common real-world OWASP issue in practice?</div><div class="a">Broken Access Control — auth (who are you) is usually implemented correctly; per-resource authorization (are you allowed to touch THIS record) is what gets forgotten.</div></div>
+    <div class="qa-item"><div class="q">Zero trust in one line?</div><div class="a">No implicit trust based on network location — every request, internal or external, is authenticated and authorized.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 16 — SECURITY · Interview Prep Series</footer>
+</body>
+</html>
