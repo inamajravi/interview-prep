@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI/ML Platform on AWS — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 17 / AI Engineering Lead</div>
+  <h1>AI/ML Platform Engineering on AWS</h1>
+  <p>SageMaker vs Bedrock, MLOps pipelines, vector stores, IaC for AI infra, and inference scaling — the platform layer underneath ML and GenAI workloads, at the level a VP is expected to architect and defend.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#buildvsconsume">01 Build vs Consume</a>
+  <a href="#mlops">02 MLOps Pipeline</a>
+  <a href="#vectorstores">03 Vector Stores</a>
+  <a href="#iac">04 IaC for AI Infra</a>
+  <a href="#scaling">05 Inference Scaling & Cost</a>
+  <a href="#governance">06 Governance & Guardrails</a>
+  <a href="#drill">07 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="buildvsconsume" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>SageMaker vs Bedrock — Build vs Consume</h2>
+  <div class="tagline">The first architectural fork in almost every AI platform decision</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Amazon Bedrock</span>Managed access to foundation models (Claude, Titan, Llama, others) via API — no infrastructure to manage, no model training. Includes Knowledge Bases (managed RAG), Agents (managed tool-calling orchestration), and Guardrails (managed content filtering) as built-in platform capabilities.</div>
+    <div class="avoid-box"><span class="lbl">Amazon SageMaker</span>The full ML platform — train custom models from scratch, fine-tune open-source models, host your own inference endpoints, run notebooks, manage the entire ML lifecycle. Far more control, far more operational ownership.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> Bedrock is renting a fully-serviced apartment — furnished, maintained, you just move in and live. SageMaker is buying land and building a house — total control over the design, but you own the plumbing, the roof, and every repair.</div>
+
+  <div class="block-title">Why this decision matters at platform-lead level</div>
+  <p>This isn't a one-time choice — most mature AI platforms end up using both, deliberately: Bedrock for the majority of GenAI use cases where a foundation model API is sufficient (chat interfaces, summarization, RAG-based Q&A), and SageMaker specifically where you need a custom-trained model, a fine-tuned open-source model at scale, or full control over training data lineage for compliance reasons.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Default to Bedrock when</span>A foundation model's general capability, possibly augmented with RAG, meets the requirement — fastest time to production, lowest operational burden, built-in governance tooling.</div>
+    <div class="avoid-box"><span class="lbl">Reach for SageMaker when</span>You need a model trained on proprietary data from scratch, fine-tuning at a scale/cost point Bedrock's managed fine-tuning doesn't fit, or full infrastructure control for regulatory/data-residency reasons.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"My default architectural stance is Bedrock-first — it gets teams to production fastest with governance built in, and most GenAI use cases don't actually need a custom-trained model. I'd bring SageMaker in specifically where there's a real requirement Bedrock can't meet, not as a default platform choice, because the operational ownership cost is real and should be justified by an actual need."</p>
+  </div>
+</section>
+
+<section class="panel" id="mlops" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>MLOps Pipeline</h2>
+  <div class="tagline">CI/CD, but for models and data, not just code</div>
+
+  <p><b>Define:</b> The discipline of applying software engineering rigor (versioning, automated testing, CI/CD, monitoring) to the ML lifecycle — training data, model artifacts, and deployed inference endpoints — because models drift and decay in ways application code doesn't.</p>
+
+  <div class="analogy"><b>Analogy:</b> Regular CI/CD ships code that behaves the same way every time it runs, given the same input. MLOps has to account for a "correct" model from six months ago silently becoming wrong today, not because anyone changed the code, but because the real-world data it's scoring against has quietly shifted — like a tailor's measurements slowly going stale as a client's body changes, even though the suit pattern itself never changed.</div>
+
+  <div class="block-title">The pieces beyond standard CI/CD</div>
+  <ul style="font-size:14.5px;">
+    <li><b>Model Registry</b> — versioned, governed storage of trained model artifacts, with lineage back to the training data and code that produced them (SageMaker Model Registry). Answers "which exact model is in production, and what produced it" — essential for audit and rollback.</li>
+    <li><b>Feature Store</b> — a centralized, consistent source of features used both for training and real-time inference, preventing training/serving skew (a model trained on one feature computation and served with a subtly different one — a very common, hard-to-debug production bug).</li>
+    <li><b>Model Monitoring / Drift Detection</b> — tracking whether the live data distribution has drifted from training data, and whether model performance (accuracy, latency) is degrading — triggering retraining pipelines automatically when thresholds are crossed.</li>
+    <li><b>Automated Retraining Pipelines</b> — SageMaker Pipelines (or Step Functions orchestrating the same idea) — a defined, versioned, repeatable sequence: pull fresh data → retrain → evaluate against a held-out set → promote to production only if it beats the current model on defined metrics.</li>
+  </ul>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Invest in full MLOps when</span>Models are business-critical, retrained regularly, and a silent performance regression would cause real damage.</div>
+    <div class="avoid-box"><span class="lbl">Lighter-weight is fine when</span>Early-stage experimentation, low-stakes models, or models that genuinely don't need frequent retraining — full MLOps tooling is real infrastructure investment that should match the model's actual business criticality.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The thing that makes MLOps genuinely different from standard CI/CD is that a model can go wrong without any code changing at all, purely because the world moved and the model didn't — that's why monitoring for drift and having an automated, metric-gated retraining pipeline matter as much as the initial training pipeline itself."</p>
+  </div>
+</section>
+
+<section class="panel" id="vectorstores" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Vector Stores</h2>
+  <div class="tagline">The retrieval infrastructure underneath every RAG system</div>
+
+  <p><b>Define:</b> A database optimized for storing high-dimensional vectors (embeddings) and finding the nearest neighbors to a query vector — the infrastructure that makes "find documents semantically similar to this question" fast at scale.</p>
+
+  <div class="block-title">AWS options, and when each fits</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Amazon OpenSearch (with k-NN)</span>The most common choice for production RAG at scale — combines traditional keyword search with vector similarity search (hybrid search), which in practice out-performs pure vector search alone for many real-world queries.</div>
+    <div class="avoid-box"><span class="lbl">pgvector on Amazon RDS/Aurora</span>Adds vector search directly to Postgres — the pragmatic choice when your data already lives in Postgres and you don't want to stand up and operate a separate specialized system for moderate scale.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Amazon Bedrock Knowledge Bases</span>Fully managed RAG — handles chunking, embedding, storage, and retrieval as one managed capability, backed by OpenSearch Serverless or Aurora under the hood. Fastest to stand up, least operational control.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> A vector store is a librarian who's read every book and organized them not alphabetically, but by <i>meaning</i> — ask for "books about betrayal" and she can point you to relevant titles even if the word "betrayal" never appears on their covers, because she's indexed on concept similarity, not keyword matching.</div>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Managed (Bedrock KB)</span>Fastest time to value, least operational burden — right default for most teams starting out.</div>
+    <div class="avoid-box"><span class="lbl">Self-managed (OpenSearch/pgvector)</span>Needed when you require fine-grained control over chunking strategy, hybrid search tuning, or you're already operating that infrastructure for other purposes and don't want a second system.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'd start with Bedrock Knowledge Bases as the default for most RAG use cases — it removes the operational burden of standing up and tuning a vector store. I'd move to self-managed OpenSearch specifically once a team needs fine control over chunking or hybrid search relevance tuning that the managed layer doesn't expose."</p>
+  </div>
+</section>
+
+<section class="panel" id="iac" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>IaC for AI Infrastructure</h2>
+  <div class="tagline">Reproducibility matters more for AI infra than almost anywhere else</div>
+
+  <p><b>Define:</b> Defining AI/ML infrastructure — SageMaker endpoints, Bedrock guardrail configurations, vector store clusters, IAM roles scoping model access — declaratively (Terraform, AWS CDK, CloudFormation) instead of manual console clicks, so environments are reproducible, reviewable, and version-controlled.</p>
+
+  <div class="block-title">Why this matters especially for AI infra</div>
+  <p>AI infrastructure has unusually high-stakes configuration drift risk: an inference endpoint's instance type directly drives cost (GPU instances are expensive), IAM permissions around model access have real governance/compliance implications, and reproducing "the exact environment that produced this model" is essential for audit trails in regulated industries. Manual console configuration makes all of this untraceable.</p>
+
+  <div class="block-title">My real example / how this connects to what I already do</div>
+  <p>The same discipline behind config-driven, version-controlled architecture in the sanctions screening API — treating matching thresholds and watchlist source configuration as reviewable, version-controlled artifacts rather than hardcoded or manually toggled — is exactly the instinct IaC applies to AI infrastructure: nothing about "what model is deployed, with what resources, with what access" should live only in someone's memory of what they clicked in a console.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">CDK</span>Same language as your application code (TypeScript/Python/C#) — lower context-switching cost for application teams also owning infra.</div>
+    <div class="avoid-box"><span class="lbl">Terraform</span>Cloud-agnostic, huge ecosystem, often the enterprise standard already in place — the pragmatic choice when an org already has Terraform expertise and multi-cloud isn't hypothetical.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat AI infrastructure as needing IaC discipline even more than typical application infrastructure, because the cost and governance stakes of a wrong instance type or an overly broad IAM role are higher, and because reproducing exactly what infrastructure produced a given model version is often a genuine compliance requirement, not just good practice."</p>
+  </div>
+</section>
+
+<section class="panel" id="scaling" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Inference Scaling & Cost</h2>
+  <div class="tagline">GPU-backed inference is expensive — the scaling decisions here have direct P&L impact</div>
+
+  <div class="block-title">Real-time vs Batch vs Serverless inference</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Real-time endpoints</span>Always-on, low-latency, but you pay for idle capacity even with zero traffic — right for user-facing interactive experiences that need consistent sub-second response.</div>
+    <div class="avoid-box"><span class="lbl">Serverless inference</span>Scales to zero, pay-per-use — right for spiky, unpredictable, or low-volume traffic, at the cost of cold-start latency (the same trade-off as Lambda, covered in the AWS page).</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Batch/asynchronous inference</span>Right for non-interactive workloads that can tolerate delay (nightly scoring, bulk document processing) — much cheaper per-inference than real-time, since you're not paying for standing capacity between requests.</div>
+  </div>
+
+  <div class="block-title">Cost levers that matter most at platform-lead scale</div>
+  <ul style="font-size:14.5px;">
+    <li><b>Right-sizing instance types</b> — GPU instances vary enormously in cost; matching model size to instance size (not defaulting to the biggest available) is often the single largest cost lever.</li>
+    <li><b>Model quantization/distillation</b> — running a smaller, optimized version of a model where full precision isn't needed, meaningfully cutting inference cost and latency.</li>
+    <li><b>Prompt caching (for LLM APIs)</b> — Bedrock and most LLM providers support caching repeated prompt prefixes, which can substantially cut cost for RAG systems that repeat the same system prompt/context across many calls.</li>
+    <li><b>Auto-scaling on the right metric</b> — for LLM inference specifically, request queue depth or token throughput is often a better scaling signal than raw CPU/GPU utilization.</li>
+  </ul>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"At platform-lead level, inference cost isn't an implementation detail — it's a direct architecture decision with real P&L impact. I'd default to matching the inference pattern (real-time, batch, or serverless) to the actual traffic shape rather than always reaching for real-time endpoints, and I'd treat prompt caching and right-sized instances as standard cost hygiene, not optimizations to revisit later."</p>
+  </div>
+</section>
+
+<section class="panel" id="governance" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Governance & Guardrails</h2>
+  <div class="tagline">Where security, compliance, and AI platform architecture actually intersect</div>
+
+  <p><b>Define:</b> The controls that ensure AI systems operate within acceptable bounds — content filtering (blocking harmful outputs), PII detection/redaction, access control over which teams can deploy or call which models, and audit logging of model inputs/outputs for compliance review.</p>
+
+  <div class="block-title">Bedrock Guardrails as a concrete example</div>
+  <p>A managed capability to define denied topics, content filters (violence, hate speech, etc.), PII detection/masking, and word filters — applied consistently across any Bedrock-based application, rather than every team re-implementing their own ad-hoc content filtering. This is the kind of platform capability that turns "every team solves AI safety themselves" into "the platform provides it once, centrally."</p>
+
+  <div class="block-title">Why this is a first-class platform concern, not an afterthought</div>
+  <p>This is precisely where the JD's "navigating security, governance, architecture, and business stakeholders" shows up concretely — a platform lead has to satisfy security teams (data doesn't leak, PII is handled correctly), governance/compliance teams (audit trails exist, model decisions are explainable enough for the domain), and business stakeholders (the platform is actually usable and fast to build on) simultaneously, and these pull in different directions if not deliberately balanced.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I think about AI governance as a platform capability, not a per-project bolt-on — centralizing guardrails, PII handling, and audit logging at the platform layer means every team building on it inherits compliant behavior by default, rather than each team needing security sign-off individually on their own ad-hoc implementation. That's also usually the fastest path to actually satisfying security and governance stakeholders without slowing down every individual team."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Bedrock or SageMaker as the default platform choice?</div><div class="a">Bedrock-first — fastest to production, governance built in. SageMaker specifically when you need custom training or full infra control.</div></div>
+    <div class="qa-item"><div class="q">What makes MLOps different from standard CI/CD?</div><div class="a">A model can silently degrade with no code change, purely from data drift — needs monitoring and automated, metric-gated retraining, not just deployment automation.</div></div>
+    <div class="qa-item"><div class="q">Default vector store choice for a new RAG project?</div><div class="a">Bedrock Knowledge Bases — managed, fastest to value; move to self-managed OpenSearch when you need chunking/hybrid-search control.</div></div>
+    <div class="qa-item"><div class="q">Why does AI infra need IaC especially, not just application code?</div><div class="a">High-stakes cost (GPU instance sizing) and compliance implications (IAM scoping, reproducible training environments for audit).</div></div>
+    <div class="qa-item"><div class="q">Biggest inference cost lever, most often overlooked?</div><div class="a">Right-sizing instance type to model size, plus prompt caching for repeated LLM context — often bigger levers than architecture changes.</div></div>
+    <div class="qa-item"><div class="q">Why treat AI governance as a platform capability, not per-project?</div><div class="a">Centralizing guardrails/PII handling/audit logging means every team inherits compliant behavior by default, rather than re-solving security sign-off individually.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 17 — AI/ML PLATFORM ENGINEERING ON AWS · Interview Prep Series</footer>
+</body>
+</html>
