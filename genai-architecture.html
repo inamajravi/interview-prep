@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenAI Application Architecture — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 18 / AI Engineering Lead</div>
+  <h1>GenAI Application Architecture</h1>
+  <p>RAG, agentic system design, prompting vs fine-tuning, and LLM evaluation — the design decisions behind actually building GenAI applications, one layer up from the AWS platform underneath them.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#rag">01 RAG — Why & How</a>
+  <a href="#decision">02 Prompting vs RAG vs Fine-Tuning</a>
+  <a href="#agentic">03 Agentic System Design</a>
+  <a href="#evaluation">04 LLM Evaluation & Guardrails</a>
+  <a href="#embeddings">05 Embeddings & Semantic Search</a>
+  <a href="#drill">06 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="rag" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>RAG — Retrieval-Augmented Generation</h2>
+  <div class="tagline">Giving a model facts it wasn't trained on, at the moment it needs them</div>
+
+  <p><b>Define:</b> Instead of relying purely on what a model learned during training, RAG retrieves relevant documents/data at query time (via the vector search covered in the AWS platform page) and injects them into the prompt as context, so the model generates its answer grounded in that retrieved, current, specific information.</p>
+
+  <div class="analogy"><b>Analogy:</b> A model answering purely from training is like a brilliant colleague answering entirely from memory — knowledgeable, but their information has a cutoff date and no visibility into your company's internal documents. RAG is handing that same colleague the exact three relevant pages from your internal wiki right before they answer — same intelligence, now grounded in the specific, current facts that actually matter for this question.</div>
+
+  <div class="block-title">The pipeline, at a glance</div>
+  <ol style="font-size:14.5px; padding-left:20px;">
+    <li><b>Chunking</b> — splitting source documents into retrievable pieces, small enough to be relevant, large enough to retain context. Chunk size and overlap strategy is a real tuning decision, not an afterthought.</li>
+    <li><b>Embedding</b> — converting each chunk into a vector representing its semantic meaning.</li>
+    <li><b>Retrieval</b> — at query time, embed the user's question, find the nearest-neighbor chunks in the vector store.</li>
+    <li><b>Augmentation</b> — inject retrieved chunks into the prompt as context.</li>
+    <li><b>Generation</b> — the model produces an answer grounded in that injected context, ideally citing which chunks it used.</li>
+  </ol>
+
+  <div class="block-title">Why it exists</div>
+  <p>Retraining or fine-tuning a model every time underlying data changes is slow and expensive. RAG lets you keep the model fixed and swap out what it "knows" simply by updating the document store — dramatically cheaper and faster to keep current, and it naturally handles proprietary/private data a foundation model was never trained on in the first place.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Use RAG when</span>The knowledge needed is specific, current, or proprietary (internal docs, recent events, company-specific data) — the common case for enterprise GenAI applications.</div>
+    <div class="avoid-box"><span class="lbl">RAG doesn't fix</span>A model's fundamental reasoning ability or output style/tone — those are what fine-tuning addresses, not retrieval. RAG gives the model better facts; it doesn't make the model reason differently.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I default to RAG for grounding a GenAI application in specific, current, or proprietary knowledge, because it's dramatically cheaper to keep the underlying documents current than to retrain a model — but I'm careful not to reach for RAG when the actual problem is reasoning quality or output style, since those are fine-tuning or prompt-engineering problems, not retrieval problems."</p>
+  </div>
+</section>
+
+<section class="panel" id="decision" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Prompting vs RAG vs Fine-Tuning</h2>
+  <div class="tagline">The decision framework — in order of increasing cost and complexity</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">1. Prompt Engineering</span>Cheapest, fastest to iterate. Solves: getting a model to follow instructions, format output a certain way, or reason step-by-step. Doesn't solve: giving the model facts it doesn't know.</div>
+    <div class="avoid-box"><span class="lbl">2. RAG</span>Moderate cost, no model retraining. Solves: grounding answers in specific/current/proprietary knowledge. Doesn't solve: changing how the model reasons or its fundamental output style.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">3. Fine-Tuning</span>Highest cost, requires quality training data and evaluation infrastructure. Solves: teaching a consistent output format/style/domain-specific behavior baked into model weights, or improving performance on a narrow task beyond what prompting/RAG can achieve.</div>
+  </div>
+
+  <div class="analogy"><b>Analogy:</b> Prompting is giving a new employee clear verbal instructions for a task. RAG is also handing them the relevant reference documents to consult while they work. Fine-tuning is actually training them over weeks until the correct behavior becomes second nature, without needing to consult anything — much more expensive to do, but the resulting skill is now inherent, not something they have to look up every time.</div>
+
+  <div class="block-title">The architect-level judgment call</div>
+  <p>The default mistake is reaching for fine-tuning too early — the vast majority of GenAI application problems are actually solvable with good prompting and RAG, at a fraction of the cost and iteration time. Fine-tuning should be the last resort after prompting and RAG have genuinely been tried and fallen short on a specific, measurable dimension.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I walk this ladder in order, and I push back hard on jumping straight to fine-tuning — it's the most expensive option, requires real training data and evaluation infrastructure most teams underestimate, and in my experience the actual problem is usually solvable with better prompting or a RAG pipeline the team hasn't invested in tuning properly yet."</p>
+  </div>
+</section>
+
+<section class="panel" id="agentic" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Agentic System Design Patterns</h2>
+  <div class="tagline">Beyond the tooling story — the actual architecture of a system that plans and acts</div>
+
+  <p>This builds on the Agentic AI concepts already covered in the Agentic AI / Copilot / MCP page — here's the architecture underneath building one, not just using one.</p>
+
+  <div class="block-title">Core architectural components</div>
+  <ul style="font-size:14.5px;">
+    <li><b>Planner/Orchestrator</b> — decides what steps are needed to accomplish a goal, potentially breaking a complex task into subtasks.</li>
+    <li><b>Tool/Function calling</b> — the model's ability to invoke external functions (call an API, query a database, run code) with structured arguments, then receive the result back into its context to inform the next step.</li>
+    <li><b>Memory</b> — short-term (conversation context within a session) vs long-term (persisted facts/preferences retrieved across sessions, often itself backed by a vector store).</li>
+    <li><b>Observation/reflection loop</b> — after a tool call, the agent evaluates the result and decides the next action — this loop is what distinguishes an "agent" from a single-shot prompt-response.</li>
+  </ul>
+
+  <div class="block-title">Single-agent vs multi-agent architecture</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Single agent, many tools</span>Simpler to build, debug, and reason about — right default for most tasks, even fairly complex ones.</div>
+    <div class="avoid-box"><span class="lbl">Multi-agent (specialized agents collaborating)</span>Right when a task genuinely decomposes into distinct specialized roles (a research agent + a writing agent + a critique agent) — but adds real coordination complexity, and is often reached for prematurely when a single well-tooled agent would have worked.</div>
+  </div>
+
+  <div class="block-title">Why guardrails matter more here than in a normal application</div>
+  <p>An agent that can call tools and take real actions (not just generate text) needs explicit boundaries — which tools it can call, what actions require human approval before execution, and hard limits on iteration count to prevent runaway loops. This is a genuinely different risk profile than a chatbot that only produces text.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I default to a single well-tooled agent over a multi-agent architecture unless a task genuinely decomposes into distinct specialized roles — multi-agent systems add real coordination and debugging complexity that's often reached for prematurely. And because an agent can take real actions, not just generate text, I treat action boundaries — which tools it can call unsupervised versus which require human approval — as a first-class design decision, not an afterthought."</p>
+  </div>
+</section>
+
+<section class="panel" id="evaluation" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>LLM Evaluation & Guardrails</h2>
+  <div class="tagline">"It seems to work" isn't evaluation — GenAI needs its own testing discipline</div>
+
+  <p><b>Define:</b> Unlike traditional software with deterministic pass/fail tests, LLM outputs are probabilistic and open-ended — evaluation requires a different toolkit: a curated test set of representative inputs, a scoring method (automated metrics, LLM-as-judge, or human review), and tracking these scores over time as the prompt/model/RAG pipeline changes.</p>
+
+  <div class="block-title">Evaluation approaches</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Automated metrics</span>Fast, cheap, consistent — good for measurable properties (does the RAG answer actually cite the retrieved source, is the output valid JSON, does it stay under a length limit).</div>
+    <div class="avoid-box"><span class="lbl">LLM-as-judge</span>Using a second, often stronger model to score outputs against a rubric — scales better than human review, but inherits its own biases and isn't a substitute for human judgment on subjective quality.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Human evaluation</span>Still the gold standard for subjective quality (tone, helpfulness, correctness on nuanced domain questions) — expensive and slow, so it's typically sampled rather than run on every change.</div>
+  </div>
+
+  <div class="block-title">Hallucination mitigation — practical levers, not a solved problem</div>
+  <ul style="font-size:14.5px;">
+    <li>Grounding via RAG, with explicit instructions to answer only from provided context and say "I don't know" rather than guess.</li>
+    <li>Requiring citations back to source chunks, making unsupported claims visible/checkable.</li>
+    <li>Lower temperature settings for factual/retrieval-grounded tasks (less creative sampling variance).</li>
+    <li>A guardrails layer (Bedrock Guardrails or similar) as a final check, not a substitute for good grounding upstream.</li>
+  </ul>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat LLM evaluation as needing its own discipline, not an extension of normal unit testing — a curated eval set, a mix of automated metrics and LLM-as-judge for scale plus sampled human review for subjective quality, tracked over time as the pipeline changes. On hallucination specifically, I don't treat it as fully solvable — I treat it as something you reduce through grounding, citations, and guardrails, and design the product experience to make remaining risk visible rather than hidden."</p>
+  </div>
+</section>
+
+<section class="panel" id="embeddings" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Embeddings & Semantic Search</h2>
+  <div class="tagline">The representation that makes "similar meaning" a computable thing</div>
+
+  <p><b>Define:</b> An embedding is a fixed-length vector of numbers representing a piece of text's meaning, produced by an embedding model, such that texts with similar meaning end up as vectors that are mathematically close together (measured by cosine similarity or similar distance metrics) — even if they share few or no exact words.</p>
+
+  <div class="analogy"><b>Analogy:</b> Think of embeddings as coordinates on a map of meaning — "dog" and "puppy" end up as nearby coordinates, while "dog" and "spreadsheet" end up far apart, even though none of these words share any letters. Semantic search is then just "find the nearest coordinates to this query's coordinates" — the same operation the vector stores from the AWS Platform page are built to do fast at scale.</div>
+
+  <div class="block-title">Practical decision — embedding model choice</div>
+  <p>A real, often-overlooked decision: embedding model choice affects retrieval quality directly, and switching embedding models later means re-embedding your entire document store (a real migration cost) — so this is worth deliberate evaluation upfront (using a representative eval set against your actual domain, not just a generic benchmark), not defaulting to whatever's easiest to wire up first.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I treat embedding model selection as a real architectural decision made deliberately upfront, because changing it later means re-embedding the entire corpus — not something you want to discover is necessary after a RAG system is already in production and retrieval quality is underperforming."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What does RAG solve that fine-tuning doesn't (as efficiently)?</div><div class="a">Keeping a model grounded in current/proprietary facts without retraining — updating a document store is far cheaper than retraining.</div></div>
+    <div class="qa-item"><div class="q">What's the right order to try: prompting, RAG, fine-tuning?</div><div class="a">Prompting first, then RAG, with fine-tuning as the last resort after both have genuinely fallen short on a specific, measurable dimension.</div></div>
+    <div class="qa-item"><div class="q">What distinguishes an "agent" from a single prompt-response call?</div><div class="a">The observation/reflection loop — evaluating a tool call's result and deciding the next action, not just producing one output.</div></div>
+    <div class="qa-item"><div class="q">Default: single agent or multi-agent architecture?</div><div class="a">Single agent with many tools, unless a task genuinely decomposes into distinct specialized roles — multi-agent adds real coordination complexity often reached for prematurely.</div></div>
+    <div class="qa-item"><div class="q">Is hallucination a solvable problem?</div><div class="a">Not fully — mitigated through grounding (RAG), citations, guardrails, and product design that surfaces remaining risk rather than hiding it.</div></div>
+    <div class="qa-item"><div class="q">Why is embedding model choice a real architectural decision, not an implementation detail?</div><div class="a">Switching later requires re-embedding the entire document corpus — a real migration cost, so it deserves upfront evaluation against your actual domain.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 18 — GENAI APPLICATION ARCHITECTURE · Interview Prep Series</footer>
+</body>
+</html>

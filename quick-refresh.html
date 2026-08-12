@@ -80,6 +80,8 @@
   <a href="#testing">Testing</a>
   <a href="#cloud">Cloud</a>
   <a href="#ai">Agentic AI</a>
+  <a href="#aiplatform">AI Platform (AWS)</a>
+  <a href="#genai">GenAI Architecture</a>
   <a href="#mq">Message Queues</a>
   <a href="#k8s">Kubernetes</a>
   <a href="#resilience">Resilience</a>
@@ -209,6 +211,30 @@
     <div class="chip"><b>MCP</b>Standard protocol so any AI client calls any tool — N×M → N+M integrations.</div>
     <div class="chip"><b>Best prompting habit</b>Ask for a plan before code on non-trivial tasks.</div>
     <div class="chip"><b>Your framing</b>Architect/reviewer — same skill as reviewing a junior dev's PR.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="aiplatform">
+  <h3><span class="n">07a</span> AI/ML Platform on AWS</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Bedrock vs SageMaker</b>Bedrock-first default — fastest to prod, governance built in. SageMaker for custom training/full control.</div>
+    <div class="chip"><b>MLOps difference</b>Models silently drift with no code change — needs monitoring + gated automated retraining.</div>
+    <div class="chip"><b>Vector store default</b>Bedrock Knowledge Bases — managed; self-manage OpenSearch when you need chunking/hybrid-search control.</div>
+    <div class="chip"><b>IaC for AI</b>High cost + compliance stakes (GPU sizing, IAM scoping) — needs it even more than typical app infra.</div>
+    <div class="chip"><b>Cost lever #1</b>Right-sized instances + prompt caching — usually bigger than architecture changes.</div>
+    <div class="chip"><b>Governance</b>Centralize guardrails/PII/audit logging at platform layer, not per-project.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="genai">
+  <h3><span class="n">07b</span> GenAI Application Architecture</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>RAG</b>Grounds answers in current/proprietary facts — cheaper than retraining to keep knowledge current.</div>
+    <div class="chip"><b>Decision ladder</b>Prompting → RAG → Fine-tuning, in that order. Fine-tuning is last resort, most teams reach for it too early.</div>
+    <div class="chip"><b>What makes it an "agent"</b>The observation/reflection loop — evaluating a tool result and deciding the next action.</div>
+    <div class="chip"><b>Single vs multi-agent</b>Default single agent, many tools — multi-agent only when task genuinely decomposes into roles.</div>
+    <div class="chip"><b>Hallucination</b>Not fully solvable — mitigate via grounding, citations, guardrails; surface remaining risk in the product.</div>
+    <div class="chip"><b>Embedding model choice</b>Real upfront decision — switching later means re-embedding the whole corpus.</div>
   </div>
 </div>
 
