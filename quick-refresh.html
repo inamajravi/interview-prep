@@ -76,6 +76,7 @@
   <a href="#patterns">Patterns</a>
   <a href="#architecture">Architecture</a>
   <a href="#dotnetspring">.NET / Spring</a>
+  <a href="#javapractice">Java Streams/Concurrency</a>
   <a href="#angular">Angular</a>
   <a href="#testing">Testing</a>
   <a href="#cloud">Cloud</a>
@@ -162,6 +163,20 @@
     <div class="chip"><b>@Transactional</b>AOP proxy — same idea as wrapping a using-block transaction.</div>
     <div class="chip"><b>JpaRepository</b>Query generated from method name — no implementation needed.</div>
     <div class="chip"><b>Minimal APIs</b>Good for small focused services; Controllers scale better for large surfaces.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="javapractice">
+  <h3><span class="n">03a</span> Java Streams & Concurrency</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>groupingBy</b>2nd arg is a downstream collector — that's how you get aggregates, not just grouped lists.</div>
+    <div class="chip"><b>flatMap vs map</b>Use flatMap when your mapper itself returns a stream/collection you need merged flat.</div>
+    <div class="chip"><b>Parallel stream bug</b>Never mutate shared external state inside forEach — use collect instead.</div>
+    <div class="chip"><b>Parallel stream + I/O</b>Blocking calls starve the shared ForkJoinPool app-wide — avoid parallelStream for I/O work.</div>
+    <div class="chip"><b>thenCompose vs thenApply</b>thenCompose when the next step itself returns a CompletableFuture — same shape as flatMap vs map.</div>
+    <div class="chip"><b>volatile</b>Guarantees visibility, NOT atomicity — count++ is still a race even if count is volatile.</div>
+    <div class="chip"><b>Deadlock fix</b>Consistent lock ordering (e.g. by ID) — makes circular wait structurally impossible.</div>
+    <div class="chip"><b>Double-checked locking</b>volatile is mandatory — without it, a thread can see a partially-constructed object.</div>
   </div>
 </div>
 

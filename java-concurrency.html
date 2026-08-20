@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Async & Multithreading — Hands-On Practice</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .qbox{
+    border:1px solid rgba(142,205,221,0.4);
+    background:rgba(18,58,99,0.3);
+    border-radius:4px;
+    padding:18px 20px;
+    margin:20px 0;
+  }
+  .qbox .qnum{
+    font-family:var(--mono); font-size:11px; color:var(--amber);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block;
+  }
+  .qbox .qtext{font-size:15px; margin:0 0 4px; color:var(--paper);}
+  .qbox details{margin-top:14px; border-top:1px dashed rgba(142,205,221,0.25); padding-top:12px;}
+  .qbox summary{font-family:var(--mono); font-size:12.5px; color:var(--green); cursor:pointer;}
+  .qbox summary:hover{color:var(--blue-line);}
+  .why-note{
+    background:rgba(242,165,65,0.08); border-left:3px solid var(--amber);
+    padding:10px 14px; border-radius:0 3px 3px 0; margin-top:12px; font-size:13.5px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 20 / Hands-On Practice</div>
+  <h1>Java Async & Multithreading</h1>
+  <p>ExecutorService, CompletableFuture, thread safety, and the classic deadlock/race-condition questions — mapped to .NET's Task/async-await where the parallel makes it click faster.</p>
+  <div class="stamp">TRY IT → EXPAND SOLUTION → CHECK THE REASONING, NOT JUST THE CODE</div>
+</header>
+<nav>
+  <a href="#executors">01 ExecutorService</a>
+  <a href="#completablefuture">02 CompletableFuture</a>
+  <a href="#threadsafety">03 Thread Safety</a>
+  <a href="#deadlock">04 Deadlock</a>
+  <a href="#producerconsumer">05 Producer-Consumer</a>
+  <a href="#advanced">06 Advanced Scenarios</a>
+  <a href="#gotchas">07 Common Gotchas</a>
+</nav>
+<main>
+
+<section class="panel" id="executors" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>ExecutorService & Thread Pools</h2>
+  <div class="tagline">Why you almost never call `new Thread()` directly in real code</div>
+
+  <div class="mapping">
+    <span class="dotnet">ThreadPool / Task.Run</span>
+    <span class="arrow">↔</span>
+    <span class="spring">ExecutorService</span>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 1</span>
+    <p class="qtext">Submit 5 tasks to a fixed thread pool of 2 threads, and collect all their results once complete.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>ExecutorService executor = Executors.newFixedThreadPool(2);
+List&lt;Callable&lt;Integer&gt;&gt; tasks = IntStream.rangeClosed(1, 5)
+    .mapToObj(i -> (Callable&lt;Integer&gt;) () -> i * i)
+    .collect(Collectors.toList());
+
+List&lt;Future&lt;Integer&gt;&gt; futures = executor.invokeAll(tasks);
+List&lt;Integer&gt; results = new ArrayList&lt;&gt;();
+for (Future&lt;Integer&gt; f : futures) {
+    results.add(f.get());  // blocks until each is done
+}
+executor.shutdown();</code></pre>
+      <div class="why-note"><b>Callable vs Runnable:</b> Use <code>Callable&lt;T&gt;</code> when a task needs to return a value or throw a checked exception; <code>Runnable</code> when it doesn't. <code>invokeAll</code> submits all tasks and blocks until every one completes, returning Futures in the same order as submission — cleaner than manually calling <code>.submit()</code> in a loop when you specifically want to wait for the whole batch.</div>
+      <div class="why-note"><b>Never forget shutdown():</b> An ExecutorService's threads don't die on their own when tasks finish — forgetting to call <code>.shutdown()</code> is a classic resource leak that keeps a JVM alive indefinitely in some contexts. This is functionally the same discipline as disposing an IDisposable in .NET.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 2</span>
+    <p class="qtext">What's the practical difference between <code>newFixedThreadPool(n)</code>, <code>newCachedThreadPool()</code>, and <code>newSingleThreadExecutor()</code> — and which would you pick for a burst of 10,000 short-lived tasks?</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <div class="tradeoff-grid">
+        <div class="use-box"><span class="lbl">newFixedThreadPool(n)</span>Fixed number of threads, unbounded queue for excess tasks — predictable resource usage, but a burst can queue up unboundedly, growing memory if tasks arrive faster than they complete.</div>
+        <div class="avoid-box"><span class="lbl">newCachedThreadPool()</span>Creates new threads as needed, reuses idle ones, no real upper bound — dangerous for a 10,000-task burst since it can spawn thousands of threads and exhaust system resources.</div>
+      </div>
+      <p style="font-size:14.5px; margin-top:12px;"><b>For the 10,000 short-lived task burst:</b> a <code>newFixedThreadPool</code> sized to available cores (or a custom <code>ThreadPoolExecutor</code> with an explicit bounded queue and rejection policy) is the safer choice — cached pool's unbounded thread creation is the classic way to accidentally take down a production service under a traffic spike.</p>
+      <div class="why-note"><b>Say this in interview:</b> "I avoid newCachedThreadPool in production for anything with unpredictable volume, because it has no real ceiling on thread creation — a traffic spike can spawn enough threads to exhaust memory or hit OS thread limits. I'd use a fixed or custom bounded pool with an explicit rejection policy so the failure mode is a controlled backpressure signal, not an uncontrolled resource exhaustion."</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="completablefuture" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>CompletableFuture</h2>
+  <div class="tagline">Java's async/await — chaining, combining, and handling failure without blocking</div>
+
+  <div class="mapping">
+    <span class="dotnet">async/await + Task.WhenAll</span>
+    <span class="arrow">↔</span>
+    <span class="spring">CompletableFuture + thenCompose/allOf</span>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 3</span>
+    <p class="qtext">Fetch a user by ID asynchronously, then use that user's ID to asynchronously fetch their orders — chain these two async calls without blocking in between.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>CompletableFuture&lt;List&lt;Order&gt;&gt; ordersFuture =
+    fetchUserAsync(userId)                       // CompletableFuture&lt;User&gt;
+        .thenCompose(user -> fetchOrdersAsync(user.getId()));  // CompletableFuture&lt;List&lt;Order&gt;&gt;
+
+List&lt;Order&gt; orders = ordersFuture.get();  // block only at the very end, if needed</code></pre>
+      <div class="why-note"><b>thenCompose vs thenApply — the question that separates surface knowledge from real understanding:</b> <code>thenApply</code> is for a synchronous transform (T → R). <code>thenCompose</code> is for when your next step itself returns a <code>CompletableFuture</code> (T → CompletableFuture&lt;R&gt;) — using <code>thenApply</code> here would give you the wrong type: <code>CompletableFuture&lt;CompletableFuture&lt;List&lt;Order&gt;&gt;&gt;</code>, a nested future, same shape problem as map vs flatMap on streams.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 4</span>
+    <p class="qtext">Call three independent, unrelated async services in parallel, and combine their three results into one object once all three complete.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>CompletableFuture&lt;String&gt; f1 = fetchInventoryAsync(sku);
+CompletableFuture&lt;BigDecimal&gt; f2 = fetchPriceAsync(sku);
+CompletableFuture&lt;Rating&gt; f3 = fetchRatingAsync(sku);
+
+CompletableFuture&lt;ProductSummary&gt; combined = CompletableFuture
+    .allOf(f1, f2, f3)
+    .thenApply(v -> new ProductSummary(f1.join(), f2.join(), f3.join()));</code></pre>
+      <div class="why-note"><b>Why this matters architecturally:</b> allOf lets three independent I/O calls run concurrently instead of sequentially — three 200ms calls take ~200ms total instead of ~600ms. This is the same instinct as Task.WhenAll in .NET. Calling <code>.join()</code> after allOf has already completed is safe (non-blocking in practice, since allOf already guaranteed completion) — calling <code>.get()</code>/<code>.join()</code> on any of them *before* allOf completes is what would actually block.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 5</span>
+    <p class="qtext">Handle a failure in an async chain — if fetching a user fails, fall back to a default guest user instead of propagating the exception.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>CompletableFuture&lt;User&gt; userFuture = fetchUserAsync(userId)
+    .exceptionally(ex -> {
+        log.warn("User fetch failed, falling back to guest", ex);
+        return User.guest();
+    });</code></pre>
+      <div class="why-note"><b>exceptionally vs handle:</b> <code>exceptionally</code> only runs on failure and must return the same type T, as a recovery value. <code>handle(BiFunction&lt;T, Throwable, R&gt;)</code> runs on both success and failure, giving you a single place to branch on whether an exception occurred — useful when you want unified logic regardless of outcome, rather than a pure fallback path.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="threadsafety" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Thread Safety</h2>
+  <div class="tagline">synchronized, volatile, and atomic — three different tools for three different problems</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 6</span>
+    <p class="qtext">This counter is incremented from multiple threads and the final count is consistently wrong. Fix it, and explain exactly why the original was broken.</p>
+      <pre><code>class Counter {
+    private int count = 0;
+    public void increment() { count++; }  // BUG
+    public int get() { return count; }
+}</code></pre>
+    <details>
+      <summary>▸ Show solution</summary>
+      <p style="font-size:14.5px;"><b>Why it's broken:</b> <code>count++</code> is not atomic — it's actually three separate steps (read count, add 1, write count back). Two threads can both read the same value before either writes back, and one increment gets silently lost. This is a textbook race condition.</p>
+      <pre><code>class Counter {
+    private final AtomicInteger count = new AtomicInteger(0);
+    public void increment() { count.incrementAndGet(); }
+    public int get() { return count.get(); }
+}</code></pre>
+      <div class="why-note"><b>Why AtomicInteger over synchronized here:</b> For a single simple counter operation, <code>AtomicInteger</code> uses CPU-level compare-and-swap (CAS) instructions — no thread ever blocks waiting for a lock, just retries the CAS if another thread beat it to the update. This is measurably faster under contention than acquiring a full <code>synchronized</code> lock for something this simple. Reach for <code>synchronized</code> when you need to protect a multi-step operation across several variables atomically together — Atomic classes only protect a single variable.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 7</span>
+    <p class="qtext">What does <code>volatile</code> actually guarantee, and what does it explicitly NOT guarantee? Give an example of a bug caused by assuming volatile provides more than it does.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <p style="font-size:14.5px;"><b>What volatile guarantees:</b> Visibility — a write to a volatile variable by one thread is immediately visible to all other threads reading it (prevents threads from working off a stale, cached local copy of the value). It also establishes a happens-before ordering for that variable.</p>
+      <p style="font-size:14.5px;"><b>What it does NOT guarantee:</b> Atomicity of compound operations. <code>volatile int count; count++;</code> is <i>still</i> a race condition — volatile makes the read and the write each individually visible correctly, but doesn't make the read-modify-write sequence atomic as a whole. This is the single most common volatile misconception.</p>
+      <div class="why-note"><b>Say this in interview:</b> "I think of volatile as solving visibility, not atomicity — it's the right tool for a simple flag one thread sets and another polls, like a 'shouldStop' boolean. The moment the operation is a compound read-modify-write, like incrementing a counter, volatile alone doesn't make it thread-safe — that needs Atomic classes or synchronized."</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="deadlock" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Deadlock</h2>
+  <div class="tagline">The classic two-lock scenario — recognize it, then fix it</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 8</span>
+    <p class="qtext">Two threads, two locks — this code can deadlock. Explain exactly how, then fix it.</p>
+      <pre><code>// Thread A calls transfer(accountX, accountY, 100)
+// Thread B calls transfer(accountY, accountX, 50)  — at the same time
+void transfer(Account from, Account to, int amount) {
+    synchronized (from) {
+        synchronized (to) {
+            from.debit(amount);
+            to.credit(amount);
+        }
+    }
+}</code></pre>
+    <details>
+      <summary>▸ Show solution</summary>
+      <p style="font-size:14.5px;"><b>How the deadlock happens:</b> Thread A locks accountX, then tries to lock accountY. Simultaneously, Thread B locks accountY, then tries to lock accountX. Each thread now holds the lock the other one needs, and neither will ever release — a classic circular wait, one of the four necessary conditions for deadlock (mutual exclusion, hold-and-wait, no preemption, circular wait).</p>
+      <pre><code>void transfer(Account from, Account to, int amount) {
+    Account first = from.getId() < to.getId() ? from : to;
+    Account second = from.getId() < to.getId() ? to : from;
+    synchronized (first) {
+        synchronized (second) {
+            from.debit(amount);
+            to.credit(amount);
+        }
+    }
+}</code></pre>
+      <div class="why-note"><b>The fix — lock ordering:</b> Always acquire locks in a consistent, globally-agreed order (here, by account ID) regardless of which account is "from" and which is "to." If every thread always locks the lower ID first, circular wait becomes structurally impossible — there's no scenario where two threads are each waiting on a lock the other holds, because both always try to acquire the smaller ID first.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="producerconsumer" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Producer-Consumer</h2>
+  <div class="tagline">The pattern behind message queues, thread pools, and half the concurrency interview questions ever asked</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 9</span>
+    <p class="qtext">Implement a producer thread adding items to a shared bounded buffer, and a consumer thread removing them — without busy-waiting.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>BlockingQueue&lt;Integer&gt; buffer = new ArrayBlockingQueue&lt;&gt;(10);
+
+// Producer thread
+new Thread(() -> {
+    for (int i = 0; i < 100; i++) {
+        try {
+            buffer.put(i);  // blocks automatically if buffer is full
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}).start();
+
+// Consumer thread
+new Thread(() -> {
+    while (true) {
+        try {
+            int item = buffer.take();  // blocks automatically if buffer is empty
+            process(item);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
+        }
+    }
+}).start();</code></pre>
+      <div class="why-note"><b>Why BlockingQueue, not a manually-coded wait/notify implementation:</b> The classic textbook answer to this question hand-rolls synchronization with <code>wait()</code>/<code>notify()</code> and a manually managed buffer — technically correct, but <code>BlockingQueue</code> implementations (ArrayBlockingQueue, LinkedBlockingQueue) already solve exactly this problem, correctly, with none of the subtle bugs (missed notifications, spurious wakeups) that hand-rolled wait/notify code is notorious for. A senior answer knows the manual mechanics exist but reaches for the battle-tested primitive in real code — same instinct as not hand-rolling your own thread pool when ExecutorService exists.</div>
+      <div class="why-note"><b>The interrupt handling detail people miss:</b> Catching InterruptedException and just swallowing it is a common, subtly wrong pattern — it clears the thread's interrupted status, meaning any calling code checking for interruption will incorrectly think none occurred. Re-calling <code>Thread.currentThread().interrupt()</code> restores that status for callers further up the stack to observe.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="advanced" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Advanced Scenarios</h2>
+  <div class="tagline">The ones that come up specifically at senior/lead level</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 10</span>
+    <p class="qtext">Implement a thread-safe lazy-initialized singleton, and explain why the naive version is broken.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>class Singleton {
+    private static volatile Singleton instance;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (instance == null) {                    // 1st check, no lock — fast path
+            synchronized (Singleton.class) {
+                if (instance == null) {             // 2nd check, inside lock
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}</code></pre>
+      <div class="why-note"><b>Why the naive "just synchronize the whole method" version is worse, not just simpler:</b> Synchronizing the entire getInstance() method forces every single call, forever, to acquire a lock — even long after the singleton is already created and no synchronization is needed at all. This double-checked locking pattern only pays the lock cost on the rare first-initialization race, then takes a fast unsynchronized path for every call after that.</div>
+      <div class="why-note"><b>Why volatile is mandatory here, not optional:</b> Without volatile, another thread could see a partially-constructed object due to instruction reordering — the reference gets assigned before the constructor has fully finished running, a genuinely subtle JVM memory model issue. This is exactly the kind of detail that separates "recited double-checked locking" from actually understanding why each piece is there.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 11</span>
+    <p class="qtext">You have a shared <code>HashMap</code> being read by many threads and occasionally written by one. What are your options, ranked by how you'd actually choose?</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <div class="tradeoff-grid">
+        <div class="use-box"><span class="lbl">ConcurrentHashMap (usual first choice)</span>Lock-striped internally — different segments of the map can be written concurrently without one global lock, and reads generally don't block at all. The right default for most shared-map scenarios.</div>
+        <div class="avoid-box"><span class="lbl">Collections.synchronizedMap(new HashMap&lt;&gt;())</span>Wraps every single operation in one global lock — simple, but effectively single-threaded for writes and even reads block each other, unlike ConcurrentHashMap's finer-grained locking.</div>
+      </div>
+      <p style="font-size:14.5px; margin-top:10px;"><b>For "many reads, rare writes" specifically:</b> if writes are truly rare and reads vastly dominate, <code>ConcurrentHashMap</code> is still the right default — its read path is essentially lock-free in the common case, which is exactly the profile described.</p>
+      <div class="why-note"><b>Say this in interview:</b> "I reach for ConcurrentHashMap by default for any shared map under concurrent access — it's specifically designed for exactly this read-heavy, occasional-write pattern, with much finer-grained locking than wrapping a HashMap in a single synchronized block."</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="gotchas" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Common Gotchas — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Difference between .get() with a timeout and .join() on a CompletableFuture?</div><div class="a">get() throws checked exceptions (ExecutionException, InterruptedException) and accepts a timeout; join() throws unchecked CompletionException and has no built-in timeout — join() is more convenient inside lambda chains where checked exceptions are awkward.</div></div>
+    <div class="qa-item"><div class="q">What's a spurious wakeup, and why do you always check the condition in a while loop, not an if, after wait()?</div><div class="a">A thread can wake from wait() without actually being notified (a JVM-level artifact) — using while (!condition) { wait(); } instead of if re-checks the condition after waking, protecting against acting on a false wakeup.</div></div>
+    <div class="qa-item"><div class="q">Does calling Thread.stop() ever belong in real code?</div><div class="a">No — deprecated and inherently unsafe, since it can release locks mid-operation leaving shared state corrupted. Use a volatile flag the thread checks itself, or interrupt() combined with cooperative cancellation instead.</div></div>
+    <div class="qa-item"><div class="q">Is ArrayList thread-safe for concurrent reads while one thread writes?</div><div class="a">No — needs CopyOnWriteArrayList (great for read-heavy, rarely-written lists, since reads never block) or explicit synchronization/Collections.synchronizedList otherwise.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 20 — JAVA ASYNC & MULTITHREADING · Interview Prep Series</footer>
+</body>
+</html>

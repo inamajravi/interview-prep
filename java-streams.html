@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Streams — Hands-On Practice</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .qbox{
+    border:1px solid rgba(142,205,221,0.4);
+    background:rgba(18,58,99,0.3);
+    border-radius:4px;
+    padding:18px 20px;
+    margin:20px 0;
+  }
+  .qbox .qnum{
+    font-family:var(--mono); font-size:11px; color:var(--amber);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block;
+  }
+  .qbox .qtext{font-size:15px; margin:0 0 4px; color:var(--paper);}
+  .qbox .qhint{font-size:13px; color:var(--slate); margin:6px 0 0;}
+  .qbox details{margin-top:14px; border-top:1px dashed rgba(142,205,221,0.25); padding-top:12px;}
+  .qbox summary{font-family:var(--mono); font-size:12.5px; color:var(--green); cursor:pointer;}
+  .qbox summary:hover{color:var(--blue-line);}
+  .why-note{
+    background:rgba(242,165,65,0.08); border-left:3px solid var(--amber);
+    padding:10px 14px; border-radius:0 3px 3px 0; margin-top:12px; font-size:13.5px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 19 / Hands-On Practice</div>
+  <h1>Java Streams — Pro Level</h1>
+  <p>Real problems, not syntax recall. Read the question, try it yourself first, then expand the solution. Each one includes the "why this and not the obvious alternative" reasoning interviewers actually probe for.</p>
+  <div class="stamp">TRY IT → EXPAND SOLUTION → CHECK THE REASONING, NOT JUST THE CODE</div>
+</header>
+<nav>
+  <a href="#basics">01 Core Chains</a>
+  <a href="#grouping">02 Grouping & Partitioning</a>
+  <a href="#flatmap">03 flatMap</a>
+  <a href="#customcollector">04 Custom Collectors</a>
+  <a href="#parallel">05 Parallel Stream Pitfalls</a>
+  <a href="#advanced">06 Advanced Combinators</a>
+  <a href="#gotchas">07 Common Gotchas</a>
+</nav>
+<main>
+
+<section class="panel" id="basics" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Core Chains — Warm-Up</h2>
+  <div class="tagline">If these feel slow, everything below will feel much harder than it needs to</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 1</span>
+    <p class="qtext">Given a <code>List&lt;String&gt;</code> of words, return a comma-separated string of all words longer than 4 characters, in uppercase, sorted alphabetically.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>String result = words.stream()
+    .filter(w -> w.length() > 4)
+    .map(String::toUpperCase)
+    .sorted()
+    .collect(Collectors.joining(", "));</code></pre>
+      <div class="why-note"><b>Why this order:</b> Filter before map — reduces the working set before doing the (slightly) more expensive uppercase transform on every remaining element. Small on a short list, but it's the correct default habit for larger pipelines: narrow first, transform second.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 2</span>
+    <p class="qtext">Given a <code>List&lt;Integer&gt;</code>, find the sum of squares of all even numbers, without a traditional for-loop.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>int sumOfSquares = numbers.stream()
+    .filter(n -> n % 2 == 0)
+    .mapToInt(n -> n * n)
+    .sum();</code></pre>
+      <div class="why-note"><b>Why mapToInt, not map:</b> <code>map</code> on a <code>Stream&lt;Integer&gt;</code> would give you a <code>Stream&lt;Integer&gt;</code> back, requiring unboxing overhead and no direct <code>.sum()</code>. <code>mapToInt</code> converts to an <code>IntStream</code> — a primitive specialization avoiding autoboxing entirely, with <code>.sum()</code> built in. This distinction (object stream vs primitive stream) is a very common thing interviewers check for.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="grouping" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Grouping & Partitioning</h2>
+  <div class="tagline">The pattern behind most real-world "aggregate this data" interview questions</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 3</span>
+    <p class="qtext">Given a <code>List&lt;Employee&gt;</code> (with <code>department</code> and <code>salary</code> fields), group employees by department, and for each department compute the average salary — result should be a <code>Map&lt;String, Double&gt;</code>.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Map&lt;String, Double&gt; avgSalaryByDept = employees.stream()
+    .collect(Collectors.groupingBy(
+        Employee::getDepartment,
+        Collectors.averagingDouble(Employee::getSalary)
+    ));</code></pre>
+      <div class="why-note"><b>The pattern:</b> <code>groupingBy</code> takes a classifier function and a <b>downstream collector</b> — that second argument is the part people forget exists. Without it, you'd get <code>Map&lt;String, List&lt;Employee&gt;&gt;</code> and need a second pass to compute averages. Passing <code>averagingDouble</code> as the downstream collector does the aggregation in the same single pass.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 4</span>
+    <p class="qtext">Given the same employee list, produce a <code>Map&lt;String, Long&gt;</code> of department → count of employees earning above $100,000.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Map&lt;String, Long&gt; highEarnerCountByDept = employees.stream()
+    .filter(e -> e.getSalary() > 100_000)
+    .collect(Collectors.groupingBy(
+        Employee::getDepartment,
+        Collectors.counting()
+    ));</code></pre>
+      <div class="why-note"><b>Trap to watch for:</b> Filtering before grouping here is correct because we want counts <i>of the filtered set</i>, per department. If instead you needed "for every department, how many earn above 100k, including departments with zero" you'd need to group first, then filter within each group — filtering before grouping silently drops departments with zero matches from the result map entirely.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 5</span>
+    <p class="qtext">Split a <code>List&lt;Integer&gt;</code> into two groups: even and odd, as a <code>Map&lt;Boolean, List&lt;Integer&gt;&gt;</code>.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Map&lt;Boolean, List&lt;Integer&gt;&gt; partitioned = numbers.stream()
+    .collect(Collectors.partitioningBy(n -> n % 2 == 0));
+// partitioned.get(true) -> evens, partitioned.get(false) -> odds</code></pre>
+      <div class="why-note"><b>partitioningBy vs groupingBy:</b> Use <code>partitioningBy</code> specifically for a boolean predicate — it always returns exactly two keys (true/false), even if one group is empty, unlike <code>groupingBy</code> which only creates keys that actually occur. Reaching for <code>groupingBy(predicate)</code> instead of <code>partitioningBy</code> is a common "it works but shows you don't know the more precise tool" tell.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="flatmap" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>flatMap</h2>
+  <div class="tagline">The operation most candidates can define but can't apply under pressure</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 6</span>
+    <p class="qtext">Given a <code>List&lt;List&lt;Integer&gt;&gt;</code> (a list of lists), return a single flat, deduplicated, sorted <code>List&lt;Integer&gt;</code>.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>List&lt;Integer&gt; result = nestedLists.stream()
+    .flatMap(List::stream)
+    .distinct()
+    .sorted()
+    .collect(Collectors.toList());</code></pre>
+      <div class="why-note"><b>Why flatMap, not map:</b> <code>map(List::stream)</code> would give you a <code>Stream&lt;Stream&lt;Integer&gt;&gt;</code> — a stream of streams, which isn't directly usable. <code>flatMap</code> takes each inner stream and merges all their elements into one single flat stream. Rule of thumb: if your mapping function itself returns a stream/collection and you want one merged result, you need flatMap, not map.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 7</span>
+    <p class="qtext">Given a <code>List&lt;Order&gt;</code> where each Order has a <code>List&lt;LineItem&gt;</code>, find all unique product names across every order.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Set&lt;String&gt; uniqueProducts = orders.stream()
+    .flatMap(order -> order.getLineItems().stream())
+    .map(LineItem::getProductName)
+    .collect(Collectors.toSet());</code></pre>
+      <div class="why-note"><b>Real-world shape:</b> This exact pattern — flatten a one-to-many relationship, then map to the field you actually need — is the most common practical use of flatMap. It shows up constantly: orders→line items, customers→addresses, departments→employees→skills.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="customcollector" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Custom Collectors</h2>
+  <div class="tagline">Pro-level territory — most candidates have never had to write one</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 8</span>
+    <p class="qtext">Write a custom <code>Collector</code> that joins a stream of strings with a comma, but wraps the final result in square brackets — without using <code>Collectors.joining(", ", "[", "]")</code> (which does exist and is the real answer for this specific case — but implement it manually to demonstrate you understand the Collector interface).</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Collector&lt;String, StringBuilder, String&gt; bracketJoin =
+    Collector.of(
+        StringBuilder::new,                          // supplier: new accumulator
+        (sb, s) -> {                                  // accumulator: add one element
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(s);
+        },
+        (sb1, sb2) -> {                                // combiner: merge two accumulators
+            if (sb1.length() > 0 && sb2.length() > 0) sb1.append(", ");
+            return sb1.append(sb2);
+        },
+        sb -> "[" + sb + "]"                           // finisher: transform to final result
+    );
+
+String result = words.stream().collect(bracketJoin);</code></pre>
+      <div class="why-note"><b>The four parts of a Collector:</b> <b>Supplier</b> creates a fresh mutable container per (potentially parallel) chunk. <b>Accumulator</b> folds one element into that container. <b>Combiner</b> merges two containers together — this is what makes parallel streams possible, since each thread accumulates its own container and combiner merges results. <b>Finisher</b> transforms the final container into the actual result type. Understanding the combiner's role is usually the part that separates "recited the definition" from "actually gets it."</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="parallel" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Parallel Stream Pitfalls</h2>
+  <div class="tagline">The question that separates people who've read about streams from people who've been burned by them</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 9</span>
+    <p class="qtext">What's wrong with this code, and how would you fix it?</p>
+      <pre><code>List&lt;Integer&gt; results = new ArrayList&lt;&gt;();
+numbers.parallelStream()
+    .forEach(n -> results.add(n * n));  // BUG</code></pre>
+    <details>
+      <summary>▸ Show solution</summary>
+      <p style="font-size:14.5px;">This is a classic race condition — <code>ArrayList</code> is not thread-safe, and multiple threads calling <code>.add()</code> concurrently during a parallel stream can corrupt internal state, silently drop elements, or throw <code>ArrayIndexOutOfBoundsException</code>. The fix is to never mutate shared external state from inside a stream operation — use <code>collect</code> instead, which is specifically designed to be parallel-safe:</p>
+      <pre><code>List&lt;Integer&gt; results = numbers.parallelStream()
+    .map(n -> n * n)
+    .collect(Collectors.toList());</code></pre>
+      <div class="why-note"><b>The general rule:</b> Stream operations should be side-effect-free. The moment a lambda inside <code>map</code>/<code>forEach</code>/<code>filter</code> mutates something outside the stream (a shared list, a counter, an external variable), you've introduced a race condition the instant that stream runs in parallel — and it can even bite you in sequential streams if the same collection is touched elsewhere concurrently.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 10</span>
+    <p class="qtext">When would you actually reach for <code>.parallelStream()</code> in production, and when would you specifically avoid it?</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <div class="tradeoff-grid">
+        <div class="use-box"><span class="lbl">Reach for it when</span>The dataset is large, the per-element work is genuinely CPU-intensive, and the operation is stateless/side-effect-free — parallel streams use the common <code>ForkJoinPool</code>, so real gains require real per-element cost to outweigh the splitting/merging overhead.</div>
+        <div class="avoid-box"><span class="lbl">Avoid it when</span>The dataset is small (overhead exceeds benefit), the operation involves I/O (blocking calls exhaust the shared ForkJoinPool used by <i>all</i> parallel streams app-wide, including unrelated ones), or ordering matters and hasn't been explicitly preserved.</div>
+      </div>
+      <div class="why-note"><b>The I/O trap specifically:</b> All parallel streams in a JVM share the same common ForkJoinPool by default. A parallel stream doing blocking I/O (a DB call, an HTTP call per element) can starve that shared pool, silently degrading unrelated parallel streams running elsewhere in the same application — this is a genuinely dangerous, hard-to-diagnose production issue, not a theoretical concern.</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="advanced" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Advanced Combinators</h2>
+  <div class="tagline">reduce, Collectors.teeing, and knowing when NOT to use a stream at all</div>
+
+  <div class="qbox">
+    <span class="qnum">Question 11</span>
+    <p class="qtext">Using <code>reduce</code>, find the longest string in a <code>List&lt;String&gt;</code> — without using <code>Collectors.maxBy</code> or <code>.max()</code>.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>Optional&lt;String&gt; longest = words.stream()
+    .reduce((a, b) -> a.length() >= b.length() ? a : b);</code></pre>
+      <div class="why-note"><b>Why Optional:</b> The no-seed-value overload of <code>reduce</code> returns <code>Optional&lt;T&gt;</code> because the stream might be empty — there'd be no "longest" to return. This is a common thing candidates get wrong: forgetting reduce without an identity value must handle the empty-stream case, and Optional is how the API forces you to.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 12</span>
+    <p class="qtext">Compute both the sum and the average of a <code>List&lt;Integer&gt;</code> in a single pass, without iterating the list twice.</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <pre><code>var result = numbers.stream()
+    .collect(Collectors.teeing(
+        Collectors.summingInt(Integer::intValue),
+        Collectors.averagingInt(Integer::intValue),
+        (sum, avg) -> Map.of("sum", sum, "average", avg)
+    ));</code></pre>
+      <div class="why-note"><b>Why this is genuinely pro-level:</b> <code>Collectors.teeing</code> (Java 12+) runs two collectors over the same stream in a single pass and combines their results — most candidates' first instinct is to call <code>.stream()</code> twice (once for sum, once for average), which works but iterates the source twice unnecessarily. Knowing teeing exists is a strong signal of staying current with the Collectors API beyond the Java 8 basics.</div>
+    </details>
+  </div>
+
+  <div class="qbox">
+    <span class="qnum">Question 13</span>
+    <p class="qtext">When would you deliberately choose a plain for-loop over a stream, even though a stream could technically do the job?</p>
+    <details>
+      <summary>▸ Show solution</summary>
+      <p style="font-size:14.5px;">Three legitimate reasons: <b>(1) Early exit with complex state</b> — a loop with a `break` and multiple accumulated variables is often clearer than contorting a stream to short-circuit correctly. <b>(2) Genuine readability</b> — a deeply nested, multi-stage stream pipeline can become harder to read than an equivalent loop, especially for someone unfamiliar with the codebase; clarity should beat "used a stream" as a goal. <b>(3) Checked exceptions</b> — lambdas inside streams can't throw checked exceptions cleanly, forcing awkward try-catch-wrap-in-unchecked patterns that a plain loop avoids entirely.</p>
+      <div class="why-note"><b>Say this in interview:</b> "I don't treat streams as strictly superior to loops — I reach for them when they make the transformation pipeline more readable and the operations are naturally side-effect-free. A loop is still the right tool when there's complex early-exit logic, checked exceptions in play, or when a stream chain would genuinely hurt readability for the next person touching this code."</div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" id="gotchas" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Common Gotchas — Rapid Fire</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Can you reuse a stream after a terminal operation (like collect or forEach) has run?</div><div class="a">No — a stream can only be consumed once. Calling another operation on an already-consumed stream throws IllegalStateException. If you need to process the same data twice, re-create the stream from the source collection.</div></div>
+    <div class="qa-item"><div class="q">Are intermediate operations (map, filter) executed immediately when called?</div><div class="a">No — streams are lazy. Intermediate operations only run when a terminal operation (collect, forEach, reduce, etc.) is invoked, and elements are processed one at a time through the whole pipeline, not stage by stage across the whole collection.</div></div>
+    <div class="qa-item"><div class="q">What happens if you call .peek() and expect it for side-effect logic?</div><div class="a">peek() is meant for debugging/inspection, not for driving actual application logic — and if there's no terminal operation, or if the JVM optimizes the pipeline, peek's side effects may not even run as expected. Don't rely on it for anything beyond debugging.</div></div>
+    <div class="qa-item"><div class="q">groupingBy's downstream Map implementation — can you rely on iteration order?</div><div class="a">No — the default groupingBy returns a HashMap, with no guaranteed order. Use groupingBy with a TreeMap::new supplier (the 3-arg overload) if you need sorted keys.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 19 — JAVA STREAMS, PRO LEVEL · Interview Prep Series</footer>
+</body>
+</html>
