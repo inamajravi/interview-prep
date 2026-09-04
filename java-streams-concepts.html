@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Streams — Mapped from .NET LINQ</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .side-by-side{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:12px 0;}
+  @media(max-width:640px){.side-by-side{grid-template-columns:1fr;}}
+  .code-col{background:#081A30; border:1px solid rgba(142,205,221,0.25); border-radius:4px; padding:12px 14px;}
+  .code-col .lbl{color:var(--slate); font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:6px;}
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 19a / Java Deep Dive</div>
+  <h1>Java Streams — Mapped from .NET LINQ</h1>
+  <p>You already know this. Streams and LINQ solve the same problem the same way — a fluent pipeline over a sequence, built from small composable operations. Every concept below is something you use daily in C# — same idea, different method name.</p>
+  <div class="stamp">Once this clicks, head to the <a href="java-streams.html" style="color:var(--amber);">Java Streams Pro-Level practice page</a> for hands-on problems</div>
+</header>
+<nav>
+  <a href="#corecept">01 The Core Concept</a>
+  <a href="#mapfilter">02 map / filter / Select / Where</a>
+  <a href="#reduce">03 reduce / Aggregate</a>
+  <a href="#collect">04 collect / ToList / ToDictionary</a>
+  <a href="#sortdistinct">05 sorted / distinct</a>
+  <a href="#flatmap">06 flatMap / SelectMany</a>
+  <a href="#grouping">07 groupingBy / GroupBy</a>
+  <a href="#optional">08 Optional / Nullable</a>
+  <a href="#laziness">09 Laziness — the Trap That Bites Both</a>
+  <a href="#parallel">10 Parallel Streams / PLINQ</a>
+  <a href="#drill">11 Full Mapping Table Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="corecept" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The Core Concept — Same Idea, Different Vocabulary</h2>
+  <div class="tagline">A pipeline of small, composable operations over a sequence, deferred until you actually need the result</div>
+
+  <div class="mapping">
+    <span class="dotnet">IEnumerable&lt;T&gt; + LINQ methods</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Stream&lt;T&gt; + Stream API</span>
+  </div>
+
+  <p><b>Define:</b> Both LINQ and the Stream API let you express "take this sequence, transform it, filter it, aggregate it" as a chain of small operations, rather than a manual loop with mutable accumulator variables. Both separate <b>building the pipeline</b> (intermediate operations — lazy, nothing executes yet) from <b>running it</b> (terminal operation — this is what actually pulls data through the pipeline).</p>
+
+  <div class="analogy"><b>Analogy:</b> Both are an assembly line, not a warehouse worker doing each step start-to-finish for one item before moving to the next. Describing the line's stations (map, filter, sorted / Select, Where, OrderBy) doesn't move a single item yet — only when you actually press "start the belt" (collect / ToList) does anything flow through.</div>
+
+  <div class="block-title">The one structural difference worth knowing upfront</div>
+  <p>A Java <code>Stream</code> can only be consumed <b>once</b> — calling a terminal operation twice on the same stream throws <code>IllegalStateException</code>. A C# <code>IEnumerable&lt;T&gt;</code> built from LINQ can typically be re-enumerated multiple times (re-running the whole pipeline each time), unless it's backed by something like a one-shot data reader. This trips up .NET developers constantly — the instinct to just call the same query variable twice doesn't transfer.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Streams and LINQ are the same mental model — lazy, composable, pull-based pipelines. The one habit I've had to build deliberately is that a Java Stream is single-use; in .NET I could re-enumerate the same IEnumerable, but in Java I need to re-create the stream from the source collection if I need to process it again."</p>
+  </div>
+</section>
+
+<section class="panel" id="mapfilter" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>map / filter ↔ Select / Where</h2>
+  <div class="tagline">The two operations you'll write a hundred times a day in either language</div>
+
+  <div class="mapping">
+    <span class="dotnet">.Select(x => ...) / .Where(x => ...)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">.map(x -> ...) / .filter(x -> ...)</span>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>var result = employees
+    .Where(e => e.Salary > 100_000)
+    .Select(e => e.Name.ToUpper())
+    .OrderBy(n => n)
+    .ToList();</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>var result = employees.stream()
+    .filter(e -> e.getSalary() > 100_000)
+    .map(e -> e.getName().toUpperCase())
+    .sorted()
+    .collect(Collectors.toList());</code></pre>
+    </div>
+  </div>
+
+  <p style="font-size:14px;">Method order, argument shape, lazy evaluation — all identical in spirit. The syntax differences are almost entirely: <code>=></code> becomes <code>-></code>, <code>Where/Select</code> becomes lowercase <code>filter/map</code>, and you need an explicit <code>.stream()</code> to enter the pipeline and an explicit terminal collector to exit it (LINQ often lets you iterate an <code>IEnumerable</code> directly without a final <code>.ToList()</code>, whereas idiomatic Java almost always materializes explicitly).</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"map and filter are Select and Where with different capitalization conventions and lambda arrow syntax — the actual semantics, including laziness, are identical. I don't think about these as new concepts, just new keywords for something I already reach for constantly."</p>
+  </div>
+</section>
+
+<section class="panel" id="reduce" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>reduce ↔ Aggregate</h2>
+  <div class="tagline">Folding a sequence down to a single value</div>
+
+  <div class="mapping">
+    <span class="dotnet">.Aggregate(seed, (acc, x) => ...)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">.reduce(identity, (acc, x) -> ...)</span>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>int total = orders.Aggregate(
+    0,
+    (sum, order) => sum + order.Amount);</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>int total = orders.stream()
+    .reduce(0,
+        (sum, order) -> sum + order.getAmount(),
+        Integer::sum);</code></pre>
+    </div>
+  </div>
+
+  <p style="font-size:14px;"><b>The extra third argument in Java's reduce:</b> a <b>combiner</b> function, used only when the stream runs in parallel — it merges partial results computed independently by different threads. LINQ's Aggregate doesn't need this in its basic form because standard LINQ execution is sequential; PLINQ (parallel LINQ) is where .NET's equivalent combining concern shows up instead.</p>
+
+  <div class="block-title">The no-seed overload — the one that trips people up</div>
+  <p>Java's <code>reduce((a, b) -> ...)</code> without an identity/seed value returns <code>Optional&lt;T&gt;</code>, because an empty stream has no result to return. LINQ's parameterless <code>.Aggregate((acc, x) => ...)</code> instead <i>throws</i> <code>InvalidOperationException</code> on an empty sequence — a real behavioral difference, not just syntax. Java forces you to handle the empty case explicitly via Optional; LINQ makes you handle it via a try-catch or an upfront <code>.Any()</code> check.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"reduce is Aggregate — but I flag one real behavioral difference, not just a naming one: the no-seed overload of reduce returns an Optional for an empty stream, while Aggregate without a seed throws on an empty sequence. Java's API design forces you to confront the empty case explicitly; LINQ lets you skip it until it blows up at runtime."</p>
+  </div>
+</section>
+
+<section class="panel" id="collect" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>collect ↔ ToList / ToDictionary / ToArray</h2>
+  <div class="tagline">The terminal operation that actually materializes your pipeline</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">.ToList() / .ToArray() (.NET)</span>Direct, specific terminal methods — one method per target shape.</div>
+    <div class="avoid-box"><span class="lbl">.collect(Collectors.X) (Java)</span>One general terminal method, <code>collect</code>, parameterized by a <code>Collector</code> strategy object — <code>Collectors.toList()</code>, <code>Collectors.toSet()</code>, <code>Collectors.toMap(...)</code>, or a custom one entirely (covered in the Pro-Level practice page).</div>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>var byId = employees
+    .ToDictionary(e => e.Id, e => e.Name);</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>var byId = employees.stream()
+    .collect(Collectors.toMap(
+        Employee::getId,
+        Employee::getName));</code></pre>
+    </div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"collect is really a general-purpose 'materialize this pipeline into some target shape' operation, where LINQ instead gives you a dedicated method per shape — ToList, ToDictionary, ToArray. Collectors.toMap is the direct equivalent of ToDictionary, just accessed through the single collect() entry point instead of its own named method."</p>
+  </div>
+</section>
+
+<section class="panel" id="sortdistinct" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>sorted / distinct ↔ OrderBy / Distinct</h2>
+  <div class="tagline">Nearly identical — one small but real gotcha on equality</div>
+
+  <div class="mapping">
+    <span class="dotnet">.OrderBy(x => x.Field) / .Distinct()</span>
+    <span class="arrow">↔</span>
+    <span class="spring">.sorted(Comparator.comparing(X::getField)) / .distinct()</span>
+  </div>
+
+  <p><b>The gotcha:</b> Java's <code>.distinct()</code> relies on <code>.equals()</code>/<code>.hashCode()</code> being correctly overridden on your objects — for a custom class without those overridden, distinct silently does nothing useful (every object is "distinct" from every other by default reference equality). C#'s <code>.Distinct()</code> has the same underlying requirement (relies on <code>Equals</code>/<code>GetHashCode</code>, or an <code>IEqualityComparer&lt;T&gt;</code> passed explicitly) — so this isn't actually a Java-specific trap, but it's worth double-checking explicitly rather than assuming distinct "just works" on custom objects in either language.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"sorted and distinct map directly to OrderBy and Distinct — the one thing I always verify in both languages, not just Java, is that the object being sorted or de-duplicated has a real equals/hashCode (or Equals/GetHashCode) implementation, because both languages' default is reference equality, which quietly breaks distinct on custom types."</p>
+  </div>
+</section>
+
+<section class="panel" id="flatmap" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>flatMap ↔ SelectMany</h2>
+  <div class="tagline">Flattening a one-to-many relationship — same operation, same purpose</div>
+
+  <div class="mapping">
+    <span class="dotnet">.SelectMany(x => x.Items)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">.flatMap(x -> x.getItems().stream())</span>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>var allLineItems = orders
+    .SelectMany(o => o.LineItems)
+    .ToList();</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>var allLineItems = orders.stream()
+    .flatMap(o -> o.getLineItems().stream())
+    .collect(Collectors.toList());</code></pre>
+    </div>
+  </div>
+
+  <p style="font-size:14px;">The one syntax quirk to remember: Java's flatMap explicitly requires you to call <code>.stream()</code> on the inner collection yourself — <code>SelectMany</code> handles that conversion implicitly since it accepts any <code>IEnumerable&lt;T&gt;</code> directly as the selector's return type. Forgetting the inner <code>.stream()</code> call in Java is a very common first mistake for anyone coming from LINQ.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"flatMap is SelectMany — same purpose, flattening a one-to-many relationship into a single sequence. The one habit to build is remembering to call .stream() on the inner collection explicitly inside the flatMap lambda, since Java doesn't do that implicit conversion the way SelectMany does."</p>
+  </div>
+</section>
+
+<section class="panel" id="grouping" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>groupingBy ↔ GroupBy</h2>
+  <div class="tagline">Same result, meaningfully different API shape underneath</div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>var byDept = employees
+    .GroupBy(e => e.Department)
+    .ToDictionary(
+        g => g.Key,
+        g => g.Average(e => e.Salary));</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>var byDept = employees.stream()
+    .collect(Collectors.groupingBy(
+        Employee::getDepartment,
+        Collectors.averagingDouble(
+            Employee::getSalary)));</code></pre>
+    </div>
+  </div>
+
+  <div class="block-title">The real difference worth understanding, not just the syntax</div>
+  <p>LINQ's <code>GroupBy</code> is a two-step mental model most .NET developers already use fluently without thinking about it: first produce groups (an <code>IEnumerable&lt;IGrouping&lt;TKey,TElement&gt;&gt;</code>), then separately aggregate each group however you like — often via a follow-up <code>.Select()</code> or <code>.ToDictionary()</code>. Java's <code>Collectors.groupingBy</code> takes the aggregation strategy <i>as a second argument to groupingBy itself</i> (a downstream collector), doing grouping and aggregating in one combined step rather than two chained ones. Same result, but the composition happens at a different point in the pipeline — this is the single most common conceptual stumble for LINQ developers picking up Streams, more than any syntax difference.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The result is identical to GroupBy plus a follow-up aggregation, but Java composes them differently — the aggregation strategy is passed in as groupingBy's second argument, a downstream collector, rather than chained afterward the way I'd naturally reach for in LINQ. Once that composition shift clicks, the rest of the Collectors API — counting, averagingDouble, mapping, toList as downstream collectors — all follows the same pattern."</p>
+  </div>
+</section>
+
+<section class="panel" id="optional" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Optional ↔ Nullable&lt;T&gt; / Nullable Reference Types</h2>
+  <div class="tagline">Forcing you to handle "might not be there" explicitly</div>
+
+  <div class="mapping">
+    <span class="dotnet">Nullable&lt;T&gt; / T? / null-conditional ?.</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Optional&lt;T&gt;</span>
+  </div>
+
+  <p><b>Define:</b> <code>Optional&lt;T&gt;</code> is a wrapper explicitly signaling "this might not have a value" — commonly returned by <code>.findFirst()</code>, <code>.findAny()</code>, or the no-seed <code>reduce</code>. It's Java's answer to the same problem C#'s nullable value types (<code>int?</code>) and, more recently, nullable reference types (<code>string?</code> with compiler null-checking) solve — making "this might be absent" visible in the type signature instead of a silent, unchecked possibility.</p>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">LINQ (.NET)</span>
+      <pre><code>var found = employees
+    .Where(e => e.Salary > 200_000)
+    .FirstOrDefault();  // null if none
+
+var name = found?.Name ?? "none";</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Streams (Java)</span>
+      <pre><code>Optional&lt;Employee&gt; found = employees.stream()
+    .filter(e -> e.getSalary() > 200_000)
+    .findFirst();
+
+String name = found.map(Employee::getName)
+    .orElse("none");</code></pre>
+    </div>
+  </div>
+
+  <div class="block-title">Trade-off / philosophical difference</div>
+  <p><code>FirstOrDefault()</code> silently returns <code>null</code> (or a type's default value) — you can forget to check it, and the compiler won't stop you (pre-nullable-reference-types C#, at least). Java's <code>Optional</code> forces the check into the type system — you can't accidentally call <code>.getName()</code> directly on an <code>Optional&lt;Employee&gt;</code> without unwrapping it first, which the compiler enforces.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Optional plays the same role nullable reference types now play in modern C# — making 'this might be absent' a compile-time-checked fact instead of a runtime surprise. The API methods differ (map/orElse/isPresent vs the null-conditional operator and null-coalescing operator), but the underlying discipline is the same."</p>
+  </div>
+</section>
+
+<section class="panel" id="laziness" data-index="09">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Laziness — the Trap That Bites Both Languages</h2>
+  <div class="tagline">Deferred execution is shared behavior, not a Java-only quirk</div>
+
+  <p><b>The shared trap:</b> Both LINQ and Streams are lazy — intermediate operations (<code>Select/Where</code>, <code>map/filter</code>) don't actually run until a terminal operation (<code>ToList/Count</code>, <code>collect/count</code>) pulls data through the pipeline. Modifying the source collection between building the query and actually enumerating/collecting it can produce surprising results or exceptions in <i>both</i> languages — this isn't a Java quirk to newly learn, it's the same deferred-execution behavior you should already be watching for in LINQ.</p>
+
+  <div class="analogy"><b>Analogy:</b> Writing a recipe down doesn't cook anything — the ingredients you actually use are whatever's in the pantry the moment you start cooking, not the moment you wrote the recipe. If someone changes the pantry contents between writing the recipe and cooking it, you get a different (or broken) result — true whether the recipe is written in LINQ or Streams.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I already watch for this in LINQ — a query built but not yet enumerated hasn't actually run — and the exact same discipline applies directly to Streams. The main new thing in Java specifically is that a stream is single-use once a terminal operation runs, which LINQ's IEnumerable generally doesn't enforce."</p>
+  </div>
+</section>
+
+<section class="panel" id="parallel" data-index="10">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Parallel Streams ↔ PLINQ</h2>
+  <div class="tagline">One extra method call to fan a pipeline across multiple threads — in both languages</div>
+
+  <div class="mapping">
+    <span class="dotnet">.AsParallel()</span>
+    <span class="arrow">↔</span>
+    <span class="spring">.parallelStream() / .parallel()</span>
+  </div>
+
+  <p>The same trade-offs apply in both: real gains only when per-element work is genuinely CPU-intensive and the dataset is large enough that splitting/merging overhead pays for itself; and the same side-effect danger — mutating shared state from inside a parallel LINQ or Stream lambda is a race condition in either language, not a Java-specific footgun. The detailed pitfalls (shared-state mutation, I/O starving the shared thread pool) are covered fully in the <a href="java-streams.html#parallel" style="color:var(--blue-line);">Pro-Level practice page</a>.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Parallel streams and PLINQ are the same idea and carry the same risk profile — I apply the same caution in both: only reach for it when per-element work is genuinely expensive, and never mutate shared state from inside the parallel pipeline."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="11">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Full Mapping Table Drill</h2>
+  <div class="tagline">Say the LINQ method, then say its Stream equivalent, out loud</div>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Select</div><div class="a">map</div></div>
+    <div class="qa-item"><div class="q">Where</div><div class="a">filter</div></div>
+    <div class="qa-item"><div class="q">Aggregate</div><div class="a">reduce (with an extra combiner argument for the parallel case)</div></div>
+    <div class="qa-item"><div class="q">ToList() / ToArray() / ToDictionary()</div><div class="a">collect(Collectors.toList() / toSet() / toMap())</div></div>
+    <div class="qa-item"><div class="q">OrderBy</div><div class="a">sorted(Comparator...)</div></div>
+    <div class="qa-item"><div class="q">Distinct</div><div class="a">distinct() — same equals/hashCode caveat in both languages</div></div>
+    <div class="qa-item"><div class="q">SelectMany</div><div class="a">flatMap — remember the explicit inner .stream() call</div></div>
+    <div class="qa-item"><div class="q">GroupBy + follow-up aggregation</div><div class="a">groupingBy(classifier, downstreamCollector) — aggregation happens inside groupingBy's 2nd argument, not chained after</div></div>
+    <div class="qa-item"><div class="q">FirstOrDefault (returns null)</div><div class="a">findFirst() (returns Optional&lt;T&gt;, forcing an explicit unwrap)</div></div>
+    <div class="qa-item"><div class="q">AsParallel()</div><div class="a">parallelStream() / .parallel() — same overhead and shared-state trade-offs</div></div>
+    <div class="qa-item"><div class="q">Sum() / Average() / Count()</div><div class="a">mapToInt(...).sum() / averagingDouble collector / count() — Java routes through primitive stream specializations (IntStream/DoubleStream) to avoid boxing overhead, which LINQ doesn't need to think about the same way</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 19a — JAVA STREAMS, MAPPED FROM .NET LINQ · Interview Prep Series · Next: <a href="java-streams.html" style="color:var(--blue-line);">Pro-Level Practice Problems</a></footer>
+</body>
+</html>
