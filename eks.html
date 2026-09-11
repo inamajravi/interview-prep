@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon EKS — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 21 / EKS Deep Dive</div>
+  <h1>Amazon EKS — Mapped to AWS</h1>
+  <p>You already know Kubernetes concepts and AWS services separately — this page is specifically the glue between them: which AWS service implements which K8s concept, and the EKS-specific decisions an interviewer will actually probe.</p>
+  <div class="stamp">DEFINE → WHY IT EXISTS → MY EXAMPLE → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#architecture">01 EKS Architecture</a>
+  <a href="#nodeoptions">02 Node Options</a>
+  <a href="#networking">03 Networking (VPC CNI)</a>
+  <a href="#irsa">04 IAM Integration (IRSA)</a>
+  <a href="#loadbalancing">05 Load Balancing & Ingress</a>
+  <a href="#storage">06 Storage (CSI Drivers)</a>
+  <a href="#autoscaling">07 Autoscaling</a>
+  <a href="#decision">08 EKS vs ECS vs Self-Managed</a>
+  <a href="#drill">09 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="architecture" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>EKS Architecture</h2>
+  <div class="tagline">What "managed" actually means — and what you still own</div>
+
+  <p><b>Define:</b> EKS is AWS's managed Kubernetes control plane — AWS runs and patches the API server, etcd, and scheduler across multiple Availability Zones for you. You bring the worker nodes (or use Fargate to skip that too) and everything you deploy onto the cluster.</p>
+
+  <div class="analogy"><b>Analogy:</b> Same analogy as the Kubernetes page's AKS entry, but worth restating precisely for EKS: it's booking a flight rather than building an airline — AWS handles the runway, air traffic control, and safety inspections (the control plane); you still own what's in your cargo hold and how it's packed (your workloads, node configuration, and IAM).</div>
+
+  <div class="block-title">What AWS owns vs what you still own</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">AWS owns</span>Control plane availability/patching, etcd backups and encryption, API server scaling, Kubernetes version upgrades (you trigger them, AWS executes the mechanics).</div>
+    <div class="avoid-box"><span class="lbl">You still own</span>Worker node patching (unless using Fargate or Bottlerocket with managed updates), IAM policy design, networking/VPC configuration, add-on version management, and everything about what you actually deploy.</div>
+  </div>
+
+  <div class="block-title">Why this distinction matters in an interview</div>
+  <p>"Managed Kubernetes" is a common phrase candidates use loosely — being precise about exactly which layer is managed (control plane) versus which layer still requires real operational ownership (nodes, networking, IAM, add-ons) is what signals actual EKS experience versus a surface-level read of the marketing page.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"EKS removes control plane operations specifically — etcd, API server availability, version patching of that layer — but node management, networking, and IAM integration are still real architectural decisions I own. I wouldn't describe EKS as 'fully managed Kubernetes' without that distinction, because the node and networking layer is where most of the actual platform engineering work happens."</p>
+  </div>
+</section>
+
+<section class="panel" id="nodeoptions" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Node Options — Managed Node Groups, Self-Managed, Fargate</h2>
+  <div class="tagline">Three ways to actually run your Pods, with real operational trade-offs between them</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Managed Node Groups (MNG)</span>AWS provisions and manages the EC2 instances as an Auto Scaling Group, handles node draining during updates, and simplifies the AMI/upgrade lifecycle. The default, sensible choice for most workloads — meaningfully less operational overhead than self-managed nodes.</div>
+    <div class="avoid-box"><span class="lbl">Self-Managed Node Groups</span>You provision and manage the EC2 instances/ASG yourself, full control over AMI, bootstrap scripts, and instance lifecycle. Needed when you require a custom AMI, unusual instance configuration, or specific bootstrap behavior MNG doesn't support.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Fargate for EKS</span>No nodes to manage at all — each Pod runs in its own isolated compute environment, sized automatically to the Pod's resource requests. Genuinely serverless Kubernetes: no node patching, no capacity planning, pay per Pod's actual resource usage.</div>
+  </div>
+
+  <div class="block-title">Why Fargate isn't the default for everything</div>
+  <div class="avoid-box"><span class="lbl">Real Fargate limitations</span>No DaemonSets (a common pattern for node-level agents like log shippers), no privileged containers, no GPU workloads, and higher per-Pod cost at sustained high density compared to bin-packing many Pods onto shared EC2 nodes. It's the right default for bursty, security-isolated, or operationally-simple workloads — not a universal replacement for node groups.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I default to Managed Node Groups for most workloads — best balance of operational simplicity and flexibility. I'd reach for Fargate specifically for workloads that benefit from per-Pod isolation and don't need DaemonSets or GPU access, and self-managed nodes only when there's a genuine requirement MNG can't satisfy, like a custom AMI or non-standard bootstrap process."</p>
+  </div>
+</section>
+
+<section class="panel" id="networking" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Networking — the VPC CNI</h2>
+  <div class="tagline">The single most distinctive, and most commonly misunderstood, piece of EKS networking</div>
+
+  <p><b>Define:</b> By default, EKS uses the <b>Amazon VPC CNI plugin</b>, which gives every Pod a real, routable IP address directly from your VPC's subnet — unlike most other Kubernetes networking implementations (Calico, Flannel) which use an overlay network with a separate, non-VPC-routable IP space for Pods.</p>
+
+  <div class="analogy"><b>Analogy:</b> An overlay network (the non-AWS-default approach) is like giving every apartment in a building an internal-only extension number that only works within the building's own phone system — someone outside has to go through a receptionist (NAT/gateway) to reach them. The VPC CNI instead gives every apartment its own real street address, directly reachable and routable by anyone on the same network, with no translation layer in between.</div>
+
+  <div class="block-title">Why this design, and the real trade-off it creates</div>
+  <p>Giving Pods real VPC IPs means they can be reached directly by other AWS services (and reach them) using standard VPC networking, security groups, and routing — no overlay translation overhead, simpler troubleshooting, and native integration with VPC-level tools. The real cost: <b>IP address exhaustion</b>. Each EC2 instance type has a hard limit on how many ENI (network interface) IP addresses it can attach, which directly caps how many Pods can run per node — a genuinely common production issue on smaller instance types running many small Pods.</p>
+
+  <div class="block-title">Trade-off / the actual EKS-specific mitigation</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Prefix Delegation mode</span>A VPC CNI feature that assigns IP address prefixes (not just individual IPs) to ENIs, dramatically increasing the Pod-per-node density ceiling — the standard fix once you hit IP exhaustion on smaller instance types.</div>
+    <div class="avoid-box"><span class="lbl">Security Groups for Pods</span>A related VPC CNI capability letting you attach a specific EC2 security group directly to individual Pods (not just the node) — meaningfully finer-grained network policy than Kubernetes NetworkPolicy alone provides, at the cost of added configuration complexity.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The VPC CNI giving every Pod a real routable VPC IP is the single most distinctive thing about EKS networking versus vanilla Kubernetes — it simplifies integration with other AWS services but creates a real IP exhaustion risk tied directly to instance type ENI limits. I'd flag Prefix Delegation mode as the standard fix once that becomes a constraint, rather than just reaching for bigger instances by default."</p>
+  </div>
+</section>
+
+<section class="panel" id="irsa" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>IAM Integration — IRSA</h2>
+  <div class="tagline">The EKS-specific concept most likely to come up, and most likely to separate real experience from surface knowledge</div>
+
+  <p><b>Define:</b> IRSA — <b>IAM Roles for Service Accounts</b> — lets you attach a specific, scoped IAM role directly to a Kubernetes Service Account, so Pods using that Service Account can call AWS APIs (S3, DynamoDB, SQS, etc.) with exactly the permissions that role grants — no shared credentials, no overly broad node-level IAM role covering every Pod on that node.</p>
+
+  <div class="analogy"><b>Analogy:</b> Without IRSA, every Pod on a node effectively inherits the node's own IAM role — like every apartment in a building sharing one master key that opens every door in the city the building manager has access to. IRSA gives each apartment its own key, cut to open only the specific doors that apartment actually needs — even though they're all in the same building.</div>
+
+  <div class="block-title">Why it exists — the problem before IRSA</div>
+  <p>Before IRSA, the common (and risky) pattern was granting the EC2 node's IAM role broad enough permissions to cover every Pod that might run on it — meaning a compromised or misconfigured Pod could access AWS resources far beyond what it actually needed, since it inherited the node's entire permission set. IRSA lets you follow the principle of least privilege at the Pod level, not just the node level — directly connecting back to the Zero Trust and least-privilege concepts covered in the Security page.</p>
+
+  <div class="block-title">How it actually works, at the level worth knowing</div>
+  <p>IRSA uses an OIDC identity provider associated with the EKS cluster — the Service Account gets a Kubernetes-issued, short-lived token that AWS's STS (Security Token Service) trusts and exchanges for temporary AWS credentials scoped to the linked IAM role, via <code>AssumeRoleWithWebIdentity</code>. No long-lived AWS credentials are ever stored in the cluster — the whole flow is short-lived token exchange, which also directly satisfies the "no static secrets, rotate constantly" instinct from good security practice generally.</p>
+
+  <div class="block-title">Trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Always use IRSA when</span>A Pod needs to call any AWS API — this should be the default pattern for essentially every workload, not an advanced/optional feature.</div>
+    <div class="avoid-box"><span class="lbl">The anti-pattern to flag</span>Broad node-instance-role permissions that every Pod on that node inherits — this is exactly the kind of over-privileged default an interviewer wants to hear you identify and correct, given how directly it maps to the Broken Access Control and least-privilege themes in the Security page.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"IRSA is how I'd apply least-privilege at the Pod level on EKS specifically — scoping IAM permissions to exactly what a given Service Account's Pods need, rather than letting every Pod on a node inherit a broad shared node-level role. It's the direct EKS-specific expression of the same zero-trust, least-privilege discipline I'd apply anywhere else — no Pod should have more AWS access than its own specific job requires."</p>
+  </div>
+</section>
+
+<section class="panel" id="loadbalancing" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Load Balancing & Ingress — the AWS Load Balancer Controller</h2>
+  <div class="tagline">How the Kubernetes Service/Ingress concepts you already know map onto real AWS load balancers</div>
+
+  <div class="mapping">
+    <span class="dotnet">Kubernetes: Service type=LoadBalancer / Ingress</span>
+    <span class="arrow">↔</span>
+    <span class="spring">AWS: Network Load Balancer / Application Load Balancer</span>
+  </div>
+
+  <p><b>Define:</b> The <b>AWS Load Balancer Controller</b> is what actually watches for Kubernetes Service and Ingress objects on EKS and provisions real AWS load balancers to match — a Service of <code>type: LoadBalancer</code> provisions a real NLB, and an Ingress object provisions a real ALB, directly connecting back to the ALB-vs-NLB decision already covered on the AWS page (Layer 7 content-aware routing vs Layer 4 raw throughput).</p>
+
+  <div class="block-title">Two ALB target modes — a real EKS-specific decision</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Instance mode</span>Traffic routes to a NodePort on each EC2 instance, then gets forwarded internally to the right Pod via kube-proxy — an extra network hop, but works with any CNI.</div>
+    <div class="avoid-box"><span class="lbl">IP mode (the common EKS default with VPC CNI)</span>The ALB routes traffic directly to each Pod's own VPC IP address, skipping the node/kube-proxy hop entirely — lower latency, and only possible because the VPC CNI already gives every Pod a real routable VPC IP in the first place. This is a direct example of the networking section above enabling a real, concrete benefit elsewhere in the stack.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The AWS Load Balancer Controller is the bridge between Kubernetes' native Service/Ingress abstractions and real AWS load balancers — and I'd specifically call out IP target mode as a concrete payoff of the VPC CNI's Pod-level VPC IPs, since it lets the ALB route straight to a Pod without an extra kube-proxy hop, which instance mode can't avoid."</p>
+  </div>
+</section>
+
+<section class="panel" id="storage" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Storage — CSI Drivers</h2>
+  <div class="tagline">Connecting Kubernetes' storage abstractions to real AWS storage services</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Amazon EBS CSI Driver</span>Provisions real EBS volumes as Kubernetes PersistentVolumes — the standard choice for a single Pod needing durable block storage (a database, for example). EBS volumes attach to exactly one node at a time — an important constraint tying directly back to the StatefulSet concept from the Kubernetes page: a Pod with EBS-backed storage that gets rescheduled to a different node requires the volume to detach and reattach.</div>
+    <div class="avoid-box"><span class="lbl">Amazon EFS CSI Driver</span>Provisions EFS (a network file system) — right when multiple Pods across multiple nodes need to read/write the same shared storage simultaneously, something EBS's single-node-attach model can't do at all.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The choice comes down to one question: does exactly one Pod need durable storage, or do multiple Pods need to share the same storage concurrently? EBS CSI for the first case, EFS CSI for the second — and EBS's single-node-attach constraint is exactly why a StatefulSet's stable Pod identity matters, since Kubernetes needs to know which specific Pod a given volume belongs to when rescheduling happens."</p>
+  </div>
+</section>
+
+<section class="panel" id="autoscaling" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Autoscaling — Cluster Autoscaler vs Karpenter</h2>
+  <div class="tagline">Scaling the nodes themselves, not just the Pods — HPA from the Kubernetes page handles Pod-level scaling; this is one layer down</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Cluster Autoscaler (the original approach)</span>Watches for unschedulable Pods (no node has enough capacity) and scales an existing Auto Scaling Group to add nodes — works within the constraint of pre-defined ASG instance types and launch templates.</div>
+    <div class="avoid-box"><span class="lbl">Karpenter (the newer, increasingly preferred approach)</span>Provisions nodes directly, choosing the actual best-fit instance type and size for the specific pending Pods' requirements at that moment — not limited to a pre-defined ASG's fixed instance type, and generally faster to provision and more cost-efficient through better bin-packing.</div>
+  </div>
+
+  <div class="block-title">Why this distinction is worth knowing precisely</div>
+  <p>Karpenter's group-less, just-in-time provisioning model is a meaningfully different architecture from Cluster Autoscaler's "scale a predefined group" model — it's increasingly the recommended default for new EKS clusters specifically because of better cost efficiency (right-sized instances, not just more of a fixed type) and faster node provisioning during scale-up events.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'd lean toward Karpenter for new clusters — its just-in-time, right-sized provisioning tends to beat Cluster Autoscaler's fixed-ASG model on both cost and scale-up latency. Cluster Autoscaler still makes sense where an org already has mature, fixed ASG-based capacity planning and doesn't want to introduce a new provisioning model — but I wouldn't default to it for a greenfield EKS setup today."</p>
+  </div>
+</section>
+
+<section class="panel" id="decision" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>EKS vs ECS vs Self-Managed Kubernetes</h2>
+  <div class="tagline">The platform-level decision underneath everything else on this page</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">EKS</span>Full Kubernetes API and ecosystem — right when you need Kubernetes-native tooling, multi-cloud portability is a real (not hypothetical) requirement, or the org already has Kubernetes expertise and tooling investment.</div>
+    <div class="avoid-box"><span class="lbl">ECS (Elastic Container Service)</span>AWS's own simpler, proprietary container orchestrator — less operational complexity than EKS, no Kubernetes concepts to learn, tighter native AWS integration by default. Right when a team is fully committed to AWS and doesn't need Kubernetes' portability or ecosystem, and wants to minimize orchestration complexity.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Self-managed Kubernetes on EC2</span>Full control over every layer, including the control plane — right only when there's a genuine, specific reason EKS's managed control plane doesn't satisfy (rare in practice) — the operational burden is substantial and rarely justified today given how mature EKS has become.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I don't treat Kubernetes as automatically the right default — if a team is fully AWS-native with no multi-cloud requirement and wants to minimize orchestration complexity, ECS is a legitimate, often under-considered choice. I'd reach for EKS specifically when Kubernetes' ecosystem, portability, or existing team expertise is a real driver, not just because it's the more commonly discussed option."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="09">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What does EKS actually manage, precisely?</div><div class="a">The control plane — API server, etcd, scheduler — across multiple AZs. Nodes, networking, IAM, and add-ons are still your responsibility (unless also on Fargate).</div></div>
+    <div class="qa-item"><div class="q">Why can Fargate not run a DaemonSet?</div><div class="a">Each Fargate Pod runs in its own isolated compute environment with no shared node for a DaemonSet to run once-per-node on — there's no persistent node to attach to.</div></div>
+    <div class="qa-item"><div class="q">Why does the VPC CNI cause IP exhaustion issues that overlay-network CNIs don't?</div><div class="a">Every Pod gets a real VPC IP from the ENI's attached IP pool, which is capped per instance type — Prefix Delegation mode is the standard fix once you hit that ceiling.</div></div>
+    <div class="qa-item"><div class="q">What problem does IRSA solve that a node instance role doesn't?</div><div class="a">Scoping AWS permissions to the specific Service Account/Pod that needs them, instead of every Pod on a node inheriting one broad shared node-level IAM role.</div></div>
+    <div class="qa-item"><div class="q">Why does ALB IP target mode need the VPC CNI specifically?</div><div class="a">It routes traffic directly to a Pod's own VPC IP, skipping the node/kube-proxy hop — only possible because the VPC CNI gives Pods real routable VPC IPs in the first place.</div></div>
+    <div class="qa-item"><div class="q">EBS or EFS for 10 Pods across 5 nodes needing the same shared files?</div><div class="a">EFS — EBS volumes attach to exactly one node at a time and can't be shared concurrently across nodes.</div></div>
+    <div class="qa-item"><div class="q">Karpenter's key architectural difference from Cluster Autoscaler?</div><div class="a">Just-in-time, right-sized node provisioning directly for pending Pods, rather than scaling a pre-defined, fixed-instance-type Auto Scaling Group.</div></div>
+    <div class="qa-item"><div class="q">When would you pick ECS over EKS?</div><div class="a">Fully AWS-native team with no multi-cloud requirement, wanting to minimize orchestration complexity — Kubernetes' ecosystem/portability isn't a real driver for them.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 21 — AMAZON EKS · Interview Prep Series</footer>
+</body>
+</html>
