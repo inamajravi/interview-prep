@@ -86,6 +86,7 @@
   <a href="#mq">Message Queues</a>
   <a href="#k8s">Kubernetes</a>
   <a href="#eks">EKS</a>
+  <a href="#aks">AKS</a>
   <a href="#resilience">Resilience</a>
   <a href="#security">Security</a>
   <a href="#checklist">Final Checklist</a>
@@ -290,6 +291,19 @@
     <div class="chip"><b>EBS vs EFS</b>EBS = one node at a time; EFS = shared across nodes concurrently.</div>
     <div class="chip"><b>Karpenter vs Cluster Autoscaler</b>Just-in-time right-sized nodes vs scaling a fixed ASG.</div>
     <div class="chip"><b>EKS vs ECS</b>ECS is legit when fully AWS-native with no multi-cloud need — don't default to K8s.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="aks">
+  <h3><span class="n">09b</span> Azure Kubernetes Service (AKS)</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Free vs Standard tier</b>Standard = SLA-backed, always use for production — parallels EKS always being paid/SLA'd.</div>
+    <div class="chip"><b>System Node Pool</b>AKS-specific — mandatory, isolate app workloads onto separate User pools.</div>
+    <div class="chip"><b>Azure CNI vs Kubenet</b>Azure CNI = real VNet IPs (like VPC CNI); Kubenet = overlay, avoids IP exhaustion, extra NAT hop.</div>
+    <div class="chip"><b>Workload Identity</b>Direct IRSA equivalent — OIDC federation, no static credentials.</div>
+    <div class="chip"><b>AGIC → App Gateway</b>Direct ALB Controller equivalent — plus more native WAF integration than AWS's bolt-on WAF+ALB.</div>
+    <div class="chip"><b>Karpenter on Azure</b>Exists but immature — Cluster Autoscaler is still the pragmatic AKS default, unlike EKS.</div>
+    <div class="chip"><b>AKS vs Container Apps</b>Container Apps = Azure's ECS-equivalent for teams that don't need K8s directly.</div>
   </div>
 </div>
 

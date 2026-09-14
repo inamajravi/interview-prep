@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure Kubernetes Service (AKS) — Compared to EKS</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  table.compare{width:100%; border-collapse:collapse; margin:16px 0; font-size:13.5px;}
+  table.compare th{
+    font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--amber); text-align:left; padding:10px 12px; border-bottom:2px solid rgba(242,165,65,0.4);
+  }
+  table.compare td{padding:10px 12px; border-bottom:1px solid rgba(142,205,221,0.15); vertical-align:top;}
+  table.compare tr:hover td{background:rgba(142,205,221,0.05);}
+  table.compare td:first-child{font-weight:600; color:var(--paper); white-space:nowrap;}
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 22 / AKS Deep Dive</div>
+  <h1>Azure Kubernetes Service — Compared to EKS</h1>
+  <p>Same structure as the EKS page, deliberately — every AKS concept mapped directly against its AWS equivalent, so you can walk into either cloud's interview and translate on the fly.</p>
+  <div class="stamp">DEFINE → COMPARE TO EKS → TRADE-OFF</div>
+</header>
+<nav>
+  <a href="#architecture">01 AKS Architecture</a>
+  <a href="#nodepools">02 Node Pools & Virtual Nodes</a>
+  <a href="#networking">03 Networking (Azure CNI)</a>
+  <a href="#identity">04 Workload Identity</a>
+  <a href="#loadbalancing">05 Load Balancing & Ingress</a>
+  <a href="#storage">06 Storage (CSI Drivers)</a>
+  <a href="#autoscaling">07 Autoscaling</a>
+  <a href="#decision">08 AKS vs Container Apps vs ACI</a>
+  <a href="#sidebyside">09 Full Side-by-Side Table</a>
+  <a href="#drill">10 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="architecture" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>AKS Architecture — Free vs Standard Tier</h2>
+  <div class="tagline">Same "managed control plane" idea as EKS — but AKS has a pricing/SLA fork EKS doesn't</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: EKS control plane (always paid, ~$0.10/hr)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: AKS Free tier vs Standard tier</span>
+  </div>
+
+  <p><b>Define:</b> Like EKS, AKS gives you a managed control plane — Azure runs the API server, etcd, and scheduler. The real difference from EKS: AKS historically offered the control plane <b>at no extra charge</b> on the Free tier, with the <b>Standard tier</b> (a real cost, comparable to EKS's control plane fee) adding a financially-backed SLA and better support for larger, production-critical clusters.</p>
+
+  <div class="block-title">Why this fork exists, and the trade-off</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Free tier</span>No SLA guarantee on the control plane, and a lower recommended node/Pod ceiling — fine for dev/test clusters, not recommended for production workloads with real uptime requirements.</div>
+    <div class="avoid-box"><span class="lbl">Standard tier</span>Financially-backed uptime SLA, higher scale limits, and better control plane resource allocation for larger clusters — the tier you'd actually choose for anything production-facing, functionally equivalent in intent to EKS always being a paid, SLA-backed control plane.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"EKS's control plane is a flat paid, SLA-backed service by default — AKS instead makes you explicitly opt into that same guarantee via the Standard tier. I'd always specify Standard tier for a production cluster discussion, the same way I'd never suggest running a production EKS workload on anything but the standard managed control plane."</p>
+  </div>
+</section>
+
+<section class="panel" id="nodepools" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Node Pools & Virtual Nodes</h2>
+  <div class="tagline">AKS's node model maps closely to EKS's, with one extra concept: the mandatory system pool</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: Managed Node Groups / Fargate</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: Node Pools (System/User) / Virtual Nodes (ACI)</span>
+  </div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">System Node Pool (AKS-specific, no direct EKS equivalent)</span>AKS requires at least one dedicated system node pool to run critical cluster add-ons (CoreDNS, metrics-server, etc.) — best practice is keeping application workloads off it entirely, isolating them to separate User node pools. EKS has no equivalent mandatory split; its system components typically run alongside application Pods on the same managed nodes.</div>
+    <div class="avoid-box"><span class="lbl">User Node Pools</span>Directly equivalent to EKS Managed Node Groups — where your actual application workloads run, scalable and configurable per pool (different instance types, spot vs on-demand, per workload).</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Virtual Nodes (backed by Azure Container Instances)</span>AKS's equivalent to EKS Fargate — Pods run in isolated compute without a provisioned VM node, burstable and fast to scale. Similarly can't run DaemonSets, same fundamental constraint as Fargate for the same underlying reason: no persistent per-node presence to attach to.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The direct EKS parallel is User Node Pools to Managed Node Groups, and Virtual Nodes to Fargate — same trade-offs, same DaemonSet limitation on the serverless option. The one genuinely AKS-specific concept is the mandatory system node pool — I'd always isolate application workloads onto separate user pools, since starving the system pool of resources can destabilize cluster-critical add-ons in a way that has no direct EKS parallel."</p>
+  </div>
+</section>
+
+<section class="panel" id="networking" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Networking — Azure CNI vs Kubenet</h2>
+  <div class="tagline">The exact same VPC-IP-exhaustion story as EKS's VPC CNI — with an extra fork AWS doesn't have</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: VPC CNI (the only real default option)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: Azure CNI vs Kubenet (a real choice AKS makes you face upfront)</span>
+  </div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Azure CNI</span>Every Pod gets a real, routable IP directly from the Azure Virtual Network — exactly the same model, and exactly the same IP-exhaustion risk profile, as EKS's default VPC CNI. Needed when Pods must be directly reachable from other Azure VNet resources.</div>
+    <div class="avoid-box"><span class="lbl">Kubenet (Azure-specific, no EKS equivalent)</span>Pods get IPs from a separate, non-VNet-routable overlay network — nodes get real VNet IPs, but Pods don't, avoiding VNet IP exhaustion entirely at the cost of an extra NAT hop for Pod-to-VNet-resource traffic, and generally reduced feature support for newer AKS capabilities. This choice doesn't really exist on EKS, since VPC CNI is the standard default there.</div>
+  </div>
+
+  <div class="block-title">Why AKS gives you this choice and EKS effectively doesn't</div>
+  <p>Kubenet exists specifically because IP exhaustion is a real, common pain point in Azure Virtual Networks with limited address space — Azure decided to offer an escape hatch (accept an overlay network's NAT overhead to sidestep VNet IP planning entirely), where AWS instead invested in VPC CNI mitigations like Prefix Delegation to solve the same underlying problem while keeping every Pod's IP real and routable.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Azure CNI is the direct parallel to EKS's VPC CNI, including the same IP exhaustion risk on a poorly-planned VNet — Kubenet is Azure's alternative path around that problem, trading real Pod-level VNet routability for avoiding IP planning altogether, which isn't really a choice EKS offers since AWS instead solved the exhaustion problem directly via Prefix Delegation. I'd default to Azure CNI for anything needing real VNet integration and reserve Kubenet for cases where VNet address space is genuinely constrained and Pods don't need direct VNet-level reachability."</p>
+  </div>
+</section>
+
+<section class="panel" id="identity" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Identity — AKS Workload Identity</h2>
+  <div class="tagline">The exact same problem IRSA solves on EKS, solved almost identically</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: IRSA (IAM Roles for Service Accounts)</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: AKS Workload Identity (formerly Azure AD Pod Identity)</span>
+  </div>
+
+  <p><b>Define:</b> Workload Identity lets you federate a Kubernetes Service Account with an Azure AD (Entra ID) application identity, so Pods using that Service Account can call Azure APIs (Storage, Key Vault, etc.) with exactly the permissions granted to that identity — no shared node-level credentials, no long-lived secrets stored in the cluster.</p>
+
+  <div class="block-title">The mechanism — nearly a 1:1 match with IRSA</div>
+  <p>Just like IRSA, Workload Identity uses an OIDC federation between the AKS cluster and Azure AD — a Kubernetes-issued, short-lived token gets exchanged for a temporary Azure AD access token scoped to the linked identity, via workload identity federation. No static credentials are ever stored in the cluster, satisfying the same short-lived-credential, least-privilege discipline as IRSA and the same Zero Trust principle covered on the Security page.</p>
+
+  <div class="block-title">A note on naming history — worth knowing if it comes up</div>
+  <p>The predecessor to Workload Identity was <b>AAD Pod Identity</b>, now deprecated in favor of the newer OIDC-federation-based Workload Identity approach — mentioning this shows current knowledge rather than outdated familiarity, similar to how EKS's IRSA itself replaced older, less secure patterns like manually injecting AWS credentials as Kubernetes Secrets.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"AKS Workload Identity and IRSA solve the identical problem the identical way — OIDC federation exchanging a short-lived Kubernetes token for a scoped cloud identity token, avoiding both broad node-level permissions and any static credentials in the cluster. If I were designing a multi-cloud platform, I'd treat this as one consistent security pattern to enforce everywhere, not two separate mechanisms to reason about independently."</p>
+  </div>
+</section>
+
+<section class="panel" id="loadbalancing" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Load Balancing & Ingress</h2>
+  <div class="tagline">Azure's equivalent to the AWS Load Balancer Controller</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: AWS Load Balancer Controller → ALB / NLB</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: Application Gateway Ingress Controller (AGIC) → Azure Application Gateway / Azure Load Balancer</span>
+  </div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Service type=LoadBalancer</span>Provisions a standard <b>Azure Load Balancer</b> — the direct parallel to a Kubernetes Service provisioning an AWS NLB: Layer 4, simple, high-throughput.</div>
+    <div class="avoid-box"><span class="lbl">Ingress objects, via AGIC</span>The <b>Application Gateway Ingress Controller</b> watches Ingress resources and configures an <b>Azure Application Gateway</b> — Layer 7, path/host-based routing, with built-in Web Application Firewall (WAF) support — the direct parallel to Ingress provisioning an AWS ALB via the AWS Load Balancer Controller.</div>
+  </div>
+
+  <div class="block-title">A genuine Azure-side advantage worth naming</div>
+  <p>Application Gateway's built-in WAF integration is more first-class/native than the equivalent AWS pattern (which typically layers AWS WAF onto an ALB as a separate, additional configuration step) — a fair, specific point of comparison to raise if asked directly which platform's ingress story is stronger for security-sensitive public-facing workloads.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"AGIC-to-Application-Gateway is the direct parallel to the AWS Load Balancer Controller provisioning an ALB from an Ingress resource — same Layer 7 routing model. If pushed on a real difference, I'd point to Application Gateway's more integrated WAF story compared to bolting AWS WAF onto an ALB as a separate step — a small but genuine Azure-side advantage for public-facing, security-sensitive ingress."</p>
+  </div>
+</section>
+
+<section class="panel" id="storage" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Storage — Azure Disk & Azure Files CSI Drivers</h2>
+  <div class="tagline">The same EBS-vs-EFS decision, Azure-flavored</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Azure Disk CSI Driver</span>Direct parallel to EBS CSI — provisions a block-storage disk attached to exactly one node at a time. Right for a single Pod needing durable storage (a database).</div>
+    <div class="avoid-box"><span class="lbl">Azure Files CSI Driver</span>Direct parallel to EFS CSI — a network file share multiple Pods across multiple nodes can read/write concurrently. Right when storage needs to be genuinely shared.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Azure Disk to EBS, Azure Files to EFS — same decision framework applies unchanged: does exactly one Pod need it, or do multiple Pods need concurrent shared access. The single-node-attach constraint on Azure Disk creates the same StatefulSet rescheduling consideration as EBS does on EKS."</p>
+  </div>
+</section>
+
+<section class="panel" id="autoscaling" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Autoscaling</h2>
+  <div class="tagline">Cluster Autoscaler is the shared default here — Karpenter's Azure story is still catching up</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">AKS Cluster Autoscaler</span>Functionally identical to EKS's Cluster Autoscaler — scales a defined Node Pool (AKS's equivalent of an ASG) up/down based on unschedulable Pods. This is still the standard, default autoscaling approach on AKS.</div>
+    <div class="avoid-box"><span class="lbl">Karpenter on Azure</span>Karpenter (the just-in-time, right-sized provisioner covered on the EKS page) has an Azure provider, but it's meaningfully less mature and less commonly used in production on AKS than on EKS — worth knowing it exists, but Cluster Autoscaler remains the pragmatic default choice on Azure today, unlike on AWS where Karpenter is increasingly the recommended default for new clusters.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"On EKS I'd lean toward Karpenter for new clusters given how mature it's become there — on AKS, I'd stick with Cluster Autoscaler as the pragmatic default today, since Karpenter's Azure provider hasn't reached the same maturity or adoption level yet. That's a genuine, current platform difference worth naming rather than assuming feature parity across clouds."</p>
+  </div>
+</section>
+
+<section class="panel" id="decision" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>AKS vs Container Apps vs ACI</h2>
+  <div class="tagline">The same "do you actually need Kubernetes" decision as EKS vs ECS</div>
+
+  <div class="mapping">
+    <span class="dotnet">AWS: EKS vs ECS vs self-managed</span>
+    <span class="arrow">↔</span>
+    <span class="spring">Azure: AKS vs Container Apps vs ACI</span>
+  </div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">AKS</span>Full Kubernetes — right when you need the K8s ecosystem, multi-cloud portability, or existing team expertise, exactly the same reasoning as choosing EKS over ECS.</div>
+    <div class="avoid-box"><span class="lbl">Azure Container Apps</span>Azure's simpler, higher-abstraction serverless container platform (built on Kubernetes/KEDA under the hood, but fully hidden from you) — the closer parallel to ECS: less operational complexity, no Kubernetes concepts to manage, right for teams that don't need K8s directly.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Azure Container Instances (ACI)</span>The simplest option — run a single container or container group with no orchestration layer at all, comparable to AWS Fargate used standalone without ECS/EKS on top. Right for simple, isolated, short-lived workloads.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"This mirrors the EKS-vs-ECS decision closely — Container Apps is Azure's ECS-equivalent answer for teams that want containers without taking on Kubernetes directly, and ACI is closer to standalone Fargate for simple, isolated workloads. I'd apply the identical judgment: don't default to the Kubernetes option just because it's the most fully-featured — match the platform to whether the team actually needs K8s' ecosystem and portability."</p>
+  </div>
+</section>
+
+<section class="panel" id="sidebyside" data-index="09">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Full Side-by-Side Table</h2>
+  <div class="tagline">Everything on this page, at a glance</div>
+
+  <table class="compare">
+    <tr><th>Concept</th><th>AWS (EKS)</th><th>Azure (AKS)</th></tr>
+    <tr><td>Control plane cost/SLA</td><td>Always paid, SLA-backed</td><td>Free tier (no SLA) vs Standard tier (SLA-backed)</td></tr>
+    <tr><td>Standard node compute</td><td>Managed Node Groups</td><td>User Node Pools</td></tr>
+    <tr><td>Mandatory system separation</td><td>None — system components share managed nodes</td><td>Dedicated System Node Pool required</td></tr>
+    <tr><td>Serverless Pods</td><td>Fargate</td><td>Virtual Nodes (via ACI)</td></tr>
+    <tr><td>Default Pod networking</td><td>VPC CNI (real VPC IPs per Pod)</td><td>Azure CNI (real VNet IPs per Pod)</td></tr>
+    <tr><td>Overlay-network alternative</td><td>Not standard (mitigated via Prefix Delegation instead)</td><td>Kubenet (real Azure-specific alternative)</td></tr>
+    <tr><td>Pod-level cloud identity</td><td>IRSA</td><td>AKS Workload Identity</td></tr>
+    <tr><td>L4 load balancer</td><td>Network Load Balancer</td><td>Azure Load Balancer</td></tr>
+    <tr><td>L7 ingress controller</td><td>AWS Load Balancer Controller → ALB</td><td>AGIC → Application Gateway</td></tr>
+    <tr><td>Block storage CSI</td><td>EBS CSI Driver</td><td>Azure Disk CSI Driver</td></tr>
+    <tr><td>Shared file storage CSI</td><td>EFS CSI Driver</td><td>Azure Files CSI Driver</td></tr>
+    <tr><td>Modern node autoscaler</td><td>Karpenter (increasingly the default)</td><td>Cluster Autoscaler (Karpenter still immature here)</td></tr>
+    <tr><td>Simpler container platform</td><td>ECS</td><td>Azure Container Apps</td></tr>
+    <tr><td>Standalone containers, no orchestration</td><td>Fargate (standalone)</td><td>Azure Container Instances (ACI)</td></tr>
+  </table>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I think about AKS and EKS as the same underlying Kubernetes model with a thin, cloud-specific integration layer on top — the concepts transfer almost completely, and where I've called out a real difference, like the mandatory AKS system node pool or Karpenter's relative immaturity on Azure, those are genuine platform-specific facts worth knowing, not just naming conventions to memorize."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="10">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">Free tier vs Standard tier on AKS — what's the real difference?</div><div class="a">Standard tier adds a financially-backed SLA and higher scale limits — the tier you'd choose for any production workload, roughly matching EKS's control plane always being paid and SLA-backed.</div></div>
+    <div class="qa-item"><div class="q">What AKS concept has no direct EKS equivalent?</div><div class="a">The mandatory System Node Pool — AKS requires isolating cluster-critical add-ons onto a dedicated pool, separate from application workloads.</div></div>
+    <div class="qa-item"><div class="q">Azure CNI vs Kubenet — which avoids VNet IP exhaustion?</div><div class="a">Kubenet — Pods get overlay-network IPs, not real VNet IPs, at the cost of an extra NAT hop and reduced feature support.</div></div>
+    <div class="qa-item"><div class="q">What's the direct Azure equivalent of IRSA?</div><div class="a">AKS Workload Identity — same OIDC federation mechanism, exchanging a short-lived K8s token for a scoped cloud identity token.</div></div>
+    <div class="qa-item"><div class="q">Which cloud's ingress controller has more native WAF integration?</div><div class="a">Azure — Application Gateway's WAF is more first-class than layering AWS WAF onto an ALB as a separate step.</div></div>
+    <div class="qa-item"><div class="q">Is Karpenter equally mature on both clouds?</div><div class="a">No — mature and increasingly default on EKS; the Azure provider exists but is less mature, so Cluster Autoscaler remains the pragmatic AKS default.</div></div>
+    <div class="qa-item"><div class="q">Azure's equivalent to choosing ECS over EKS?</div><div class="a">Choosing Azure Container Apps over AKS — simpler, no Kubernetes concepts exposed, right when a team doesn't need K8s' ecosystem/portability.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 22 — AZURE KUBERNETES SERVICE, COMPARED TO EKS · Interview Prep Series</footer>
+</body>
+</html>
