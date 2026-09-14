@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observables vs Promises — Angular Basics</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .plain{font-size:15px; line-height:1.7;}
+  .highlight{
+    background:rgba(76,175,136,0.1); border:1px solid rgba(76,175,136,0.4);
+    border-radius:4px; padding:14px 16px; margin:16px 0; font-size:14.5px;
+  }
+  .highlight b{color:var(--green);}
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 03a / Angular Basics</div>
+  <h1>Observables vs Promises</h1>
+  <p>Not an interview reference — this is the "make it actually click" page. If RxJS has felt confusing, it's usually because Observables get explained as "like Promises but different" instead of explaining the one core idea that makes everything else make sense.</p>
+</header>
+<nav>
+  <a href="#coreidea">01 The One Idea That Unlocks Everything</a>
+  <a href="#promise">02 What a Promise Actually Is</a>
+  <a href="#observable">03 What an Observable Actually Is</a>
+  <a href="#subscribe">04 subscribe() — What Actually Happens</a>
+  <a href="#cancel">05 Cancellation — the Real Superpower</a>
+  <a href="#multiplevalues">06 Streams of Values Over Time</a>
+  <a href="#asyncpipe">07 The Async Pipe</a>
+  <a href="#subjects">08 Subject & BehaviorSubject, Simply</a>
+  <a href="#convert">09 Converting Between Them</a>
+  <a href="#drill">10 Quick Self-Check</a>
+</nav>
+<main>
+
+<section class="panel" id="coreidea" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The One Idea That Unlocks Everything Else</h2>
+  <div class="tagline">Read this section slowly — everything else on this page is just this idea applied</div>
+
+  <div class="plain">
+    <p><b>A Promise represents ONE value that will arrive ONCE, in the future.</b> You ask for something, you wait, you get exactly one answer (or exactly one error), and then it's done forever. Think of ordering a pizza — you place one order, you wait, one pizza arrives, transaction complete.</p>
+
+    <p><b>An Observable represents a STREAM of values that can arrive ZERO, ONE, OR MANY times, over time.</b> Think of subscribing to a YouTube channel — you don't get "one video" and then the subscription is done. You get however many videos that channel uploads, whenever they upload them, for as long as you stay subscribed. You could also unsubscribe at any point and stop receiving anything further.</p>
+  </div>
+
+  <div class="highlight">
+    <b>That's it. That's the whole conceptual difference.</b> Promise = one event in the future. Observable = an ongoing subscription to a stream of events, which might be zero events, one event, or an endless sequence of events, and which you can cancel at any time. Every other difference between them (cancellation, operators, the `subscribe` method, "cold" vs "hot") is a direct consequence of this one idea, not a separate thing to memorize.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"A Promise resolves once, with one value. An Observable is a subscription to a stream that can emit any number of values over time — that's the core distinction everything else, like cancellation and operators, follows from."</p>
+  </div>
+</section>
+
+<section class="panel" id="promise" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>What a Promise Actually Is</h2>
+  <div class="tagline">You already know this — it's the same shape as .NET's Task</div>
+
+  <div class="mapping">
+    <span class="dotnet">.NET: Task&lt;T&gt; / async-await</span>
+    <span class="arrow">↔</span>
+    <span class="spring">JavaScript: Promise&lt;T&gt; / async-await</span>
+  </div>
+
+  <div class="plain">
+    <p>A JavaScript <code>Promise</code> is functionally identical to a .NET <code>Task&lt;T&gt;</code> — an object representing "a value that isn't ready yet, but will be." You call an async function, get a Promise back immediately, and either <code>.then()</code> onto it or <code>await</code> it, exactly like awaiting a Task in C#.</p>
+  </div>
+
+  <pre><code>// Fetch a user, once. One value, one time.
+fetch('/api/user/42')
+    .then(response => response.json())
+    .then(user => console.log(user));
+
+// or with async/await — feels exactly like C#
+async function loadUser() {
+    const response = await fetch('/api/user/42');
+    const user = await response.json();
+    console.log(user);
+}</code></pre>
+
+  <div class="highlight">
+    <b>The key limitation to notice:</b> once you call <code>fetch(...)</code>, that HTTP request is already happening. There is no built-in way to cancel it. If you no longer care about the result (say, the user navigated away from the page), the Promise doesn't know or care — it'll still resolve eventually, and any <code>.then()</code> callback attached to it will still run, whether you still want that or not.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"A Promise is the direct JavaScript equivalent of a .NET Task — same async/await ergonomics, same 'one value, eventually' contract. The thing I'd flag as a real limitation is that a Promise can't be cancelled once started — that's actually the main reason Angular defaults to Observables for things like HTTP calls."</p>
+  </div>
+</section>
+
+<section class="panel" id="observable" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>What an Observable Actually Is</h2>
+  <div class="tagline">Not a fancier Promise — a genuinely different shape of thing</div>
+
+  <div class="plain">
+    <p>An Observable is, underneath everything, just <b>a function that Angular/RxJS calls for you when someone subscribes</b> — and that function can call back with a value (<code>next</code>) as many times as it wants, whenever it wants, until it either finishes (<code>complete</code>) or fails (<code>error</code>).</p>
+  </div>
+
+  <pre><code>const myObservable = new Observable(subscriber => {
+    subscriber.next('first value');
+    subscriber.next('second value');
+    setTimeout(() => {
+        subscriber.next('a value that arrived later');
+        subscriber.complete();  // no more values coming after this
+    }, 1000);
+});
+
+myObservable.subscribe(value => console.log(value));
+// Logs: 'first value', 'second value'
+// ...one second later, logs: 'a value that arrived later'</code></pre>
+
+  <div class="highlight">
+    <b>Notice something important:</b> nothing happened at all until <code>.subscribe()</code> was called. Creating an Observable doesn't run anything — it's just a description of "here's what will happen when someone actually subscribes." This is called being <b>lazy</b> (or "cold"), and it's a real behavioral difference from Promises, which start running the instant they're created, whether anyone is listening for the result or not.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"An Observable is lazy — nothing executes until subscribe() is called. A Promise is eager — it starts running the moment it's created, subscribed to or not. That laziness is exactly what makes Observables cancellable: if no one's subscribed yet, or you unsubscribe, the underlying work can simply never happen or get torn down."</p>
+  </div>
+</section>
+
+<section class="panel" id="subscribe" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>subscribe() — What Actually Happens</h2>
+  <div class="tagline">This is the part that trips people up most — think of it as "pressing play," not "getting a result"</div>
+
+  <div class="plain">
+    <p>Calling <code>.subscribe(callback)</code> doesn't "get the value" the way <code>await</code> does with a Promise. It says: <b>"start running this Observable's logic now, and every time it produces a value, call my callback with it."</b> That's why it's the correct mental model to think of an Observable as something you press play on, not something you retrieve a value from.</p>
+  </div>
+
+  <div class="highlight">
+    <b>In an Angular HTTP call specifically:</b> calling <code>http.get('/api/users')</code> alone does <b>nothing</b> — no network request is sent yet. It only fires when something calls <code>.subscribe()</code> on it (or the <code>async</code> pipe does that for you in a template, covered further down). This surprises a lot of people coming from Promise-based fetch, where the request starts the instant you call the function.
+  </div>
+
+  <pre><code>const users$ = this.http.get('/api/users');  // nothing happens yet — no request sent
+
+users$.subscribe(users => {                   // THIS is what actually fires the HTTP call
+    console.log(users);
+});</code></pre>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I think of subscribe() as pressing play on the Observable's underlying logic, not retrieving a value that's already in flight. For an HTTP Observable specifically, that means the actual network request doesn't fire until something subscribes — a common surprise for anyone used to fetch() or a Promise-based HTTP client, where the call is already happening the moment you invoke it."</p>
+  </div>
+</section>
+
+<section class="panel" id="cancel" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Cancellation — the Real Superpower</h2>
+  <div class="tagline">The single biggest practical reason Angular defaults to Observables over Promises</div>
+
+  <div class="plain">
+    <p>Because subscribing is what starts the work, <b>unsubscribing can stop it</b> — genuinely, not just "ignore the result." If an HTTP request is still in flight and you unsubscribe, Angular's HttpClient actually aborts the underlying request. A Promise offers you no equivalent — once started, it runs to completion no matter what, and you're just choosing whether to listen to the result or not.</p>
+  </div>
+
+  <div class="highlight">
+    <b>Where this matters in real Angular code:</b> a user types in a search box, firing an HTTP request per keystroke. Without cancellation, five keystrokes means five HTTP requests all racing to complete, and whichever slow one finishes last "wins" and overwrites the display — even if it's answering an old, outdated query. With Observables, the <code>switchMap</code> operator automatically unsubscribes from (and cancels) the previous request the moment a new keystroke fires — this is exactly the pattern from the main Angular reference page's RxJS section, and now you know <i>why</i> switchMap needs Observables specifically to do this: Promises simply have no cancellation mechanism to hook into.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Cancellation is the practical reason I reach for Observables over Promises for HTTP calls specifically — a stale, in-flight request can be genuinely aborted on unsubscribe, which is exactly what switchMap relies on for a typeahead search. A Promise-based fetch has no equivalent; you can only ignore its result once it resolves, not stop it from happening."</p>
+  </div>
+</section>
+
+<section class="panel" id="multiplevalues" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Streams of Values Over Time</h2>
+  <div class="tagline">The scenario a Promise literally cannot represent, no matter how you contort it</div>
+
+  <div class="plain">
+    <p>Some things aren't "one value in the future" — they're an ongoing sequence: every mouse click, every keystroke, every WebSocket message, every tick of a timer. A Promise has no way to model this at all — it resolves once, then it's done. An Observable models it directly and naturally, because "emit a value, possibly many times, over time" is exactly what it's built for.</p>
+  </div>
+
+  <pre><code>// Every click, for as long as this subscription lives — not just the first one
+fromEvent(document, 'click').subscribe(event => {
+    console.log('Clicked at', event.clientX, event.clientY);
+});
+
+// A live countdown timer emitting a new value every second, forever
+interval(1000).subscribe(seconds => console.log(`${seconds}s elapsed`));</code></pre>
+
+  <div class="highlight">
+    <b>This is the reframe that usually makes Observables finally click:</b> don't think "how is this different from a Promise" — think "this represents an ongoing stream of things happening, and a Promise was never trying to solve that problem in the first place." An HTTP call happens to only emit one value (the response) and then completes — which is why it can look Promise-like at first — but it's using the same general-purpose "stream" machinery as a WebSocket connection or a mouse-click listener, not a special case bolted on separately.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"HTTP calls in Angular use Observables not because a single response particularly needs stream semantics, but for consistency — the same Observable machinery used for HTTP also naturally handles WebSocket messages, user input events, and timers, which genuinely can't be modeled as a single Promise resolution. It's one consistent async model instead of a different tool per scenario."</p>
+  </div>
+</section>
+
+<section class="panel" id="asyncpipe" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The Async Pipe — Angular's Built-In Answer to "Don't Forget to Unsubscribe"</h2>
+  <div class="tagline">The single most important practical pattern for a beginner to adopt immediately</div>
+
+  <div class="plain">
+    <p>Every manual <code>.subscribe()</code> call in a component creates an ongoing subscription that must be manually cleaned up (usually in <code>ngOnDestroy</code>) or it leaks — the subscription keeps listening even after the component is gone. The <code>async</code> pipe, used directly in a template, subscribes automatically when the component initializes and <b>unsubscribes automatically when the component is destroyed</b> — no manual cleanup code needed at all.</p>
+  </div>
+
+  <div class="side-by-side">
+    <div class="code-col">
+      <span class="lbl">Manual subscribe (needs cleanup)</span>
+      <pre><code>// component.ts
+users: User[] = [];
+private sub: Subscription;
+
+ngOnInit() {
+  this.sub = this.userService.getUsers()
+    .subscribe(users => this.users = users);
+}
+
+ngOnDestroy() {
+  this.sub.unsubscribe();  // easy to forget!
+}</code></pre>
+    </div>
+    <div class="code-col">
+      <span class="lbl">Async pipe (self-managing)</span>
+      <pre><code>// component.ts
+users$ = this.userService.getUsers();
+
+// template.html
+&lt;div *ngFor="let user of users$ | async"&gt;
+  {{ user.name }}
+&lt;/div&gt;
+// subscribes on init, unsubscribes
+// automatically on destroy — nothing
+// else to write</code></pre>
+    </div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"My default is the async pipe over manual subscribe wherever the value is only needed in the template — it removes an entire category of memory-leak bugs from forgetting to unsubscribe, since Angular manages the subscription lifecycle for you. I'd only reach for a manual subscribe when I genuinely need the value inside component logic, not just for display."</p>
+  </div>
+</section>
+
+<section class="panel" id="subjects" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Subject & BehaviorSubject, Simply</h2>
+  <div class="tagline">The two you'll actually use constantly — explained without jargon first</div>
+
+  <div class="plain">
+    <p>A plain <code>Subject</code> is both an Observable AND something you can manually push values into from the outside — think of it as a live radio broadcast: if you tune in (subscribe) after something was already announced, you missed it. You only get whatever's broadcast <i>after</i> you start listening.</p>
+    <p>A <code>BehaviorSubject</code> is the same idea, but it always remembers and immediately replays its <b>most recent value</b> to any new subscriber — think of it as a radio broadcast with a "currently playing" display: even if you tune in late, you instantly see what's playing right now, not just future updates.</p>
+  </div>
+
+  <pre><code>const subject = new Subject&lt;number&gt;();
+subject.next(1);
+subject.subscribe(val => console.log('A:', val));  // A subscribes AFTER 1 was sent — misses it
+subject.next(2);  // A logs: 'A: 2'
+
+const behaviorSubject = new BehaviorSubject&lt;number&gt;(0);  // needs an initial value
+behaviorSubject.next(1);
+behaviorSubject.subscribe(val => console.log('B:', val));  // B logs: 'B: 1' IMMEDIATELY, even though it subscribed late
+behaviorSubject.next(2);  // B logs: 'B: 2'</code></pre>
+
+  <div class="highlight">
+    <b>Why this matters practically:</b> BehaviorSubject is the standard building block for shared application state in Angular services (covered on the main Angular reference page's State Management section) precisely because of this "always has a current value" property — a component that subscribes to shared state late (after the app already started) still immediately gets the current state, not nothing.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The practical difference is whether a late subscriber gets the current value immediately or has to wait for the next update — BehaviorSubject always has a 'current value' ready to hand to any new subscriber instantly, which is exactly why it's the standard choice for shared state services, where a component mounting late still needs to see what the state currently is."</p>
+  </div>
+</section>
+
+<section class="panel" id="convert" data-index="09">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Converting Between Them</h2>
+  <div class="tagline">You'll need this occasionally — a third-party library that only speaks Promises</div>
+
+  <pre><code>// Observable -> Promise (grab just the next single value)
+import { firstValueFrom } from 'rxjs';
+
+const user = await firstValueFrom(this.http.get('/api/user/42'));
+
+// Promise -> Observable
+import { from } from 'rxjs';
+
+const users$ = from(fetch('/api/users').then(r => r.json()));</code></pre>
+
+  <div class="highlight">
+    <b>Worth knowing:</b> converting an Observable to a Promise via <code>firstValueFrom</code> throws away everything that makes Observables useful — cancellation, multiple values over time — collapsing it down to "just give me the next single value, once." That's sometimes exactly what you want (a one-off HTTP call inside an async function), but it's a deliberate downgrade, not a free conversion.
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Converting Observable to Promise with firstValueFrom is a real trade-off, not just syntax — you're deliberately giving up cancellation and multi-value support to get simpler async/await ergonomics for a one-off case. I wouldn't reach for it as a default just because await feels more familiar than subscribe."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="10">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Quick Self-Check</h2>
+  <div class="tagline">If these all make sense without re-reading, the concept has clicked</div>
+  <div class="qa">
+    <div class="qa-item"><div class="q">In one sentence, what's the core difference between a Promise and an Observable?</div><div class="a">A Promise is one value, once. An Observable is a subscription to a stream that can emit zero, one, or many values over time, and can be cancelled.</div></div>
+    <div class="qa-item"><div class="q">Does calling http.get(...) send a network request immediately?</div><div class="a">No — nothing happens until something calls .subscribe() on it (or the async pipe does that for you).</div></div>
+    <div class="qa-item"><div class="q">Why can't you cancel a Promise-based fetch call?</div><div class="a">A Promise starts running the instant it's created — there's no subscription to cancel, only a result you can choose to ignore once it resolves.</div></div>
+    <div class="qa-item"><div class="q">Why does switchMap need Observables, not Promises, to cancel a stale HTTP request?</div><div class="a">Cancellation on an Observable works via unsubscribing, which actually aborts the in-flight work — Promises have no equivalent hook to cancel anything already started.</div></div>
+    <div class="qa-item"><div class="q">Why use the async pipe instead of manually calling .subscribe() in a component?</div><div class="a">It automatically subscribes on init and unsubscribes on destroy — removes the entire class of bugs caused by forgetting manual cleanup.</div></div>
+    <div class="qa-item"><div class="q">A component subscribes to shared state after the app already started — Subject or BehaviorSubject?</div><div class="a">BehaviorSubject — it immediately replays its current value to a late subscriber; a plain Subject would give that subscriber nothing until the next new value.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 03a — OBSERVABLES VS PROMISES · Interview Prep Series · Next: the full <a href="angular.html" style="color:var(--blue-line);">Angular Deep Dive</a> once this feels solid</footer>
+</body>
+</html>
