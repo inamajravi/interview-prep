@@ -19,12 +19,13 @@
 <nav>
   <a href="#di">01 DI & IoC Container</a>
   <a href="#webmvc">02 Spring MVC / Web</a>
-  <a href="#data">03 Spring Data JPA</a>
-  <a href="#boot">04 Spring Boot Autoconfig</a>
-  <a href="#aop">05 AOP</a>
-  <a href="#security">06 Spring Security</a>
-  <a href="#config">07 Profiles & Config</a>
-  <a href="#drill">08 Rapid Drill</a>
+  <a href="#lifecycle">03 Request Lifecycle</a>
+  <a href="#data">04 Spring Data JPA</a>
+  <a href="#boot">05 Spring Boot Autoconfig</a>
+  <a href="#aop">06 AOP</a>
+  <a href="#security">07 Spring Security</a>
+  <a href="#config">08 Profiles & Config</a>
+  <a href="#drill">09 Rapid Drill</a>
 </nav>
 
 <main>
@@ -127,8 +128,40 @@ public class ScreenController {
   </div>
 </section>
 
+<!-- REQUEST LIFECYCLE -->
+<section class="panel" id="lifecycle" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Request Lifecycle — Filters to Controller</h2>
+  <div class="tagline">A very common interview question, and the one place Filters vs Interceptors trips people up</div>
+
+  <p><b>Define:</b> Once a request reaches the application (past the servlet container itself), it passes through a specific, ordered set of Spring layers before your controller method ever executes — and two of those layers (Filters and Interceptors) look similar but operate at genuinely different points.</p>
+
+  <div class="analogy"><b>Analogy:</b> A nightclub. Servlet Filters are the bouncer checking ID at the street door — before anyone's even inside the venue, and before anyone knows which room you're headed to. DispatcherServlet is the host at reception deciding which room fits your request. HandlerMapping is the sign pointing to that room. HandlerInterceptors are a second, room-specific check right at that room's door — by this point, staff already know exactly which room (which controller method) you're headed into.</div>
+
+  <div class="block-title">The order, step by step</div>
+  <ol style="font-size:14.5px; padding-left:20px;">
+    <li><b>Servlet Filters</b> — plain Servlet-spec mechanism, running before Spring MVC exists in the picture at all. This is where <b>Spring Security</b> lives: one filter (<code>DelegatingFilterProxy</code>) internally running a whole chain — authentication, authorization, CSRF, and so on. A rejection here means the request never reaches Spring MVC.</li>
+    <li><b>DispatcherServlet</b> — Spring MVC's front controller, itself just a Servlet, but the single entry point everything funnels through. This is the actual "entering Spring" moment.</li>
+    <li><b>HandlerMapping</b> — DispatcherServlet asks this which controller method matches the URL + HTTP verb, resolved by scanning <code>@RequestMapping</code>/<code>@GetMapping</code> annotations.</li>
+    <li><b>HandlerInterceptor.preHandle()</b> — Spring's <i>own</i> interceptor mechanism, distinct from step 1's Filters. Runs only after a specific handler has already been resolved.</li>
+    <li><b>HandlerAdapter + argument resolution</b> — actually invokes the method, but first: <code>@RequestBody</code> triggers an <code>HttpMessageConverter</code> to deserialize JSON, <code>@PathVariable</code>/<code>@RequestParam</code> get bound, and <code>@Valid</code> validation runs — all before your method body executes.</li>
+    <li><b>Controller method runs.</b></li>
+  </ol>
+
+  <div class="block-title">The distinction interviewers actually check for</div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Servlet Filters</span>Run before handler resolution — can't see which controller/method matched, since Spring hasn't figured that out yet. Framework-agnostic (plain Servlet spec), so they work identically whether you're using Spring MVC or not.</div>
+    <div class="avoid-box"><span class="lbl">HandlerInterceptors</span>Run after handler resolution — can see the exact handler method about to be invoked (useful for method-level annotations/metadata). Spring-specific, and only apply within Spring MVC's dispatch flow.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"A request passes through Servlet Filters — which is where Spring Security sits — then Spring's DispatcherServlet front controller, which uses HandlerMapping to resolve the target method and HandlerInterceptors for pre/post logic, before the HandlerAdapter binds arguments and invokes the controller. The distinction I always flag: Filters run before Spring MVC even resolves a handler, so they can't see which controller was matched; Interceptors run after that resolution, so they can."</p>
+  </div>
+</section>
+
 <!-- SPRING DATA -->
-<section class="panel" id="data" data-index="03">
+<section class="panel" id="data" data-index="04">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Spring Data JPA</h2>
   <div class="tagline">Same idea as EF Core, but the repository is auto-generated for you</div>
@@ -182,7 +215,7 @@ public class ScreenController {
 </section>
 
 <!-- BOOT AUTOCONFIG -->
-<section class="panel" id="boot" data-index="04">
+<section class="panel" id="boot" data-index="05">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Spring Boot Autoconfiguration</h2>
   <div class="tagline">Same idea as ASP.NET Core's minimal hosting model, but more "magic" by default</div>
@@ -210,7 +243,7 @@ public class ScreenController {
 </section>
 
 <!-- AOP -->
-<section class="panel" id="aop" data-index="05">
+<section class="panel" id="aop" data-index="06">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Aspect-Oriented Programming (AOP)</h2>
   <div class="tagline">Same problem middleware/decorators solve in .NET — cross-cutting concerns without cluttering business code</div>
@@ -241,7 +274,7 @@ public class ScreenController {
 </section>
 
 <!-- SECURITY -->
-<section class="panel" id="security" data-index="06">
+<section class="panel" id="security" data-index="07">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Spring Security</h2>
   <div class="tagline">Same auth pipeline concepts as ASP.NET Core Identity/JWT middleware, different config style</div>
@@ -267,7 +300,7 @@ public class ScreenController {
 </section>
 
 <!-- CONFIG -->
-<section class="panel" id="config" data-index="07">
+<section class="panel" id="config" data-index="08">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Profiles & Configuration</h2>
   <div class="tagline">Same as appsettings.{Environment}.json + IOptions&lt;T&gt;</div>
@@ -287,7 +320,7 @@ public class ScreenController {
 </section>
 
 <!-- DRILL -->
-<section class="panel" id="drill" data-index="08">
+<section class="panel" id="drill" data-index="09">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Rapid Recall Drill — the full mapping table</h2>
   <div class="tagline">Say the Spring term, then say the .NET equivalent, out loud</div>
@@ -303,6 +336,7 @@ public class ScreenController {
     <div class="qa-item"><div class="q">@Value("${property}")</div><div class="a">IConfiguration["Key"] — single value binding from config.</div></div>
     <div class="qa-item"><div class="q">@Profile("dev")</div><div class="a">ASPNETCORE_ENVIRONMENT-based appsettings.{Env}.json layering.</div></div>
     <div class="qa-item"><div class="q">Bean scope: singleton (default) / prototype / request</div><div class="a">AddSingleton / AddTransient / AddScoped — same three lifetimes, different default (Spring defaults to singleton, .NET has no single default — you must choose).</div></div>
+    <div class="qa-item"><div class="q">Filters vs HandlerInterceptors — the key difference?</div><div class="a">Filters run before Spring MVC resolves a handler (can't see which controller matched); Interceptors run after resolution (can see the exact handler method). Spring Security lives in the Filter layer.</div></div>
   </div>
 
   <div class="say-box">
