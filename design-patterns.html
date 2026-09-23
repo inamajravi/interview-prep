@@ -72,7 +72,29 @@ var matcher = MatcherFactory.Create(config.MatchType);</code></pre>
 
   <div class="block-title">Builder</div>
   <p><b>Define:</b> Construct a complex object step-by-step instead of a constructor with 10 parameters. <b>Analogy:</b> Building a sandwich at Subway — you choose bread, then protein, then toppings, one decision at a time, rather than shouting all 10 choices at once. <b>Trade-off:</b> Unnecessary for objects with 2-3 simple fields — just use a constructor or object initializer.</p>
-  <pre><code>var order = new OrderBuilder()
+  <pre><code>public class OrderBuilder {
+    private readonly Order _order = new();
+
+    public OrderBuilder WithCustomer(string name) {
+        _order.Customer = name;
+        return this;                     // return "this" so calls chain
+    }
+    public OrderBuilder AddItem(string sku, int qty) {
+        _order.Items.Add(new OrderLine(sku, qty));
+        return this;
+    }
+    public OrderBuilder WithShipping(ShippingMethod method) {
+        _order.Shipping = method;
+        return this;
+    }
+    public Order Build() {
+        if (_order.Items.Count == 0)
+            throw new InvalidOperationException("Order needs at least one item");
+        return _order;                   // validate once, at the end
+    }
+}
+
+var order = new OrderBuilder()
     .WithCustomer("Jane Doe")
     .AddItem("Widget", qty: 3)
     .WithShipping(ShippingMethod.Express)
@@ -129,21 +151,52 @@ public class OfacAdapter : IWatchlistEntry {
   <div class="block-title">Facade</div>
   <p><b>Define:</b> Provide one simple interface over a complex subsystem. <b>Analogy:</b> A car's ignition switch — one turn of a key hides the complexity of starter motor, fuel injection, and spark plugs. <b>My example:</b> A single `ScreeningFacade.Screen(name)` hiding the orchestration across normalization → fuzzy match → phonetic match → weighted scoring → threshold check.</p>
   <pre><code>public class ScreeningFacade {
-    public ScreeningResult Screen(string name) {
-        var normalized = Normalizer.Normalize(name);
-        var fuzzy = _fuzzy.Score(normalized, target);
-        var phonetic = _phonetic.Score(normalized, target);
-        return Scorer.Combine(fuzzy, phonetic);   // one simple call hides the pipeline
+    private readonly IMatcher _fuzzy;
+    private readonly IMatcher _phonetic;
+    private readonly IMatcher _levenshtein;
+    private readonly Normalizer _normalizer;
+
+    public ScreeningFacade(IMatcher fuzzy, IMatcher phonetic, IMatcher levenshtein, Normalizer normalizer) {
+        _fuzzy = fuzzy; _phonetic = phonetic; _levenshtein = levenshtein; _normalizer = normalizer;
     }
-}</code></pre>
+
+    // caller sees ONE method — the four moving parts behind it stay hidden
+    public ScreeningResult Screen(string inputName, string watchlistEntry) {
+        var normalized = _normalizer.Normalize(inputName);
+        var fuzzyScore = _fuzzy.Score(normalized, watchlistEntry);
+        var phoneticScore = _phonetic.Score(normalized, watchlistEntry);
+        var levScore = _levenshtein.Score(normalized, watchlistEntry);
+
+        var composite = (fuzzyScore * 0.5) + (phoneticScore * 0.3) + (levScore * 0.2);
+        return new ScreeningResult(composite, composite > 0.85);
+    }
+}
+
+// consumer code — no idea any of this complexity exists underneath:
+var result = facade.Screen(inputName, entry.Name);</code></pre>
 
   <div class="block-title">Proxy</div>
   <p><b>Define:</b> A stand-in that controls access to a real object — for lazy loading, caching, access control, or logging. <b>My example:</b> EF Core's lazy-loading proxies are a textbook example you already use daily — accessing a navigation property transparently triggers a DB query behind a proxy object.</p>
-  <pre><code>public class Order {
-    private List&lt;OrderLine&gt; _lines;   // not loaded yet
+  <pre><code>public interface IReportGenerator { string Generate(); }
 
-    public List&lt;OrderLine&gt; Lines =>
-        _lines ??= LoadLinesFromDb();   // EF Core's lazy-loading proxies do exactly this</code></pre>
+public class RealReportGenerator : IReportGenerator {
+    public string Generate() {
+        Thread.Sleep(3000);              // pretend this is genuinely expensive
+        return "...large report contents...";
+    }
+}
+
+// Proxy: same interface, controls WHEN/WHETHER the real thing runs
+public class LazyReportProxy : IReportGenerator {
+    private readonly Lazy&lt;RealReportGenerator&gt; _real = new(() => new RealReportGenerator());
+    public string Generate() => _real.Value.Generate();   // only pays the cost if actually called
+}
+
+// EF Core does exactly this for navigation properties, automatically:
+public class Order {
+    private List&lt;OrderLine&gt; _lines;
+    public List&lt;OrderLine&gt; Lines => _lines ??= LoadLinesFromDb();  // lazy-loading proxy
+}</code></pre>
 </section>
 
 <section class="panel" id="behavioural" data-index="04">
@@ -168,12 +221,24 @@ var total = strategies.Sum(s => s.Score(a, b) * weights[s.GetType()]);</code></p
   <div class="block-title">Observer</div>
   <p><b>Define:</b> One-to-many notification — subject notifies all subscribed observers when its state changes, without knowing who they are. <b>Analogy:</b> A YouTube channel notifying all subscribers on a new upload. <b>My example:</b> C#'s <code>event</code>/<code>IObservable</code>, or Angular's RxJS Subject — same pattern, different syntax. It's also the foundation event-driven architecture builds on at a larger scale.</p>
   <pre><code>public class MatchEngine {
+    // the subject: exposes an event, knows nothing about who's listening
     public event Action&lt;MatchResult&gt; MatchFound;
-    private void Report(MatchResult r) => MatchFound?.Invoke(r);
+
+    public void RunScreening(string name, string entry) {
+        var score = ComputeScore(name, entry);
+        if (score > 0.85) {
+            var result = new MatchResult(name, entry, score);
+            MatchFound?.Invoke(result);          // notify every subscriber
+        }
+    }
 }
 
-// subscriber — doesn't know or care who else is listening:
-engine.MatchFound += result => auditLog.Record(result);</code></pre>
+// three independent observers, added without MatchEngine changing at all:
+engine.MatchFound += result => auditLog.Record(result);
+engine.MatchFound += result => notificationService.Send(result);
+engine.MatchFound += result => caseManagement.OpenCase(result);
+
+// adding a 4th observer later requires zero changes to MatchEngine itself</code></pre>
 
   <div class="block-title">Chain of Responsibility</div>
   <p><b>Define:</b> Pass a request along a chain of handlers until one handles it. <b>Analogy:</b> Tech support escalation — Tier 1 tries, escalates to Tier 2, then Tier 3. <b>My example:</b> ASP.NET Core middleware pipeline is exactly Chain of Responsibility — each middleware decides to handle, short-circuit, or pass along.</p>
@@ -188,13 +253,26 @@ engine.MatchFound += result => auditLog.Record(result);</code></pre>
   <div class="block-title">Template Method</div>
   <p><b>Define:</b> Define the skeleton of an algorithm in a base class, letting subclasses override specific steps. <b>Analogy:</b> A recipe card that says "prepare base, add filling, bake" — the filling step varies (apple vs cherry pie), the overall process doesn't. <b>Trade-off:</b> Relies on inheritance, which is less flexible than Strategy's composition — modern guidance often prefers Strategy over Template Method for this reason.</p>
   <pre><code>public abstract class ReportGenerator {
-    public void Generate() {                    // the fixed skeleton
+    public void Generate() {                     // the fixed skeleton — never overridden
         var data = FetchData();
-        var formatted = FormatData(data);        // subclasses override just this step
+        var formatted = FormatData(data);          // the one step that varies
         Save(formatted);
     }
-    protected abstract string FormatData(object data);
-}</code></pre>
+    protected virtual object FetchData() => Repository.GetReportData();
+    protected abstract string FormatData(object data);   // subclasses MUST implement this
+    protected virtual void Save(string content) => File.WriteAllText(OutputPath, content);
+}
+
+public class PdfReport : ReportGenerator {
+    protected override string FormatData(object data) => PdfRenderer.Render(data);
+}
+public class CsvReport : ReportGenerator {
+    protected override string FormatData(object data) => CsvSerializer.Serialize(data);
+}
+
+// same overall process either way — only the formatting step differs:
+new PdfReport().Generate();
+new CsvReport().Generate();</code></pre>
 
   <div class="block-title">Command</div>
   <p><b>Define:</b> Turn a request/action into a standalone object, so it can be queued, logged, undone, or passed around like any other value, instead of being an immediate direct method call. <b>Analogy:</b> A restaurant order slip — the request to "make a cheeseburger" is captured as a physical object (the slip) that can sit in a queue, be handed to any available chef, or be pulled back and voided, rather than the waiter having to stand there executing the order in person. <b>My example:</b> An audit-logged operation queue — wrapping "apply this sanctions list update" as a Command object lets you log it, retry it, or undo it uniformly, rather than each operation type needing bespoke undo/retry logic. <b>Trade-off:</b> Overkill for simple, immediate, one-way actions that never need queuing, logging, or undo.</p>
@@ -209,29 +287,59 @@ commandQueue.Enqueue(new ApplyListUpdateCommand(update));   // queued, logged, u
 
   <div class="block-title">State</div>
   <p><b>Define:</b> Let an object change its behavior when its internal state changes, by delegating to separate state-specific classes instead of a tangle of if/else or switch statements checking a status flag everywhere. <b>Analogy:</b> A traffic light doesn't have one giant function checking "if red do X, if yellow do Y, if green do Z" scattered across the whole system — each light state itself knows what comes next and how to behave. <b>My example:</b> A payment's lifecycle (Pending → Processing → Succeeded/Failed) is a textbook State candidate — instead of a large switch statement on a status enum scattered through the codebase, each state encapsulates its own valid transitions and behavior. <b>Trade-off:</b> More classes than a single switch statement — only worth it once the state-dependent behavior is genuinely complex, not for 2-3 trivial states.</p>
-  <pre><code>public interface IPaymentState { IPaymentState Process(Payment p); }
-
-public class PendingState : IPaymentState {
-    public IPaymentState Process(Payment p) => new ProcessingState();
+  <pre><code>public interface IPaymentState {
+    IPaymentState Process(Payment payment);
+    string Name { get; }
 }
 
-// no switch statement anywhere:
+public class PendingState : IPaymentState {
+    public string Name => "Pending";
+    public IPaymentState Process(Payment payment) {
+        payment.ChargeCard();
+        return new ProcessingState();          // transition decided by THIS state
+    }
+}
+public class ProcessingState : IPaymentState {
+    public string Name => "Processing";
+    public IPaymentState Process(Payment payment) =>
+        payment.GatewayConfirmed ? new CompletedState() : new FailedState();
+}
+public class CompletedState : IPaymentState {
+    public string Name => "Completed";
+    public IPaymentState Process(Payment payment) =>
+        throw new InvalidOperationException("Completed payments can't be processed again");
+}
+
+// no switch statement anywhere — each state knows its own valid transitions:
 payment.State = payment.State.Process(payment);</code></pre>
 
   <div class="block-title">Visitor</div>
   <p><b>Define:</b> Add a new operation across a family of related classes without modifying those classes themselves, by having each accept a "visitor" object that implements the new operation per type. <b>Analogy:</b> A building inspector who visits different room types (kitchen, bathroom, bedroom) and applies inspection-specific logic per room type, without the rooms themselves needing to know anything about inspection — the inspector (visitor) carries all that logic. <b>Trade-off:</b> Adds real complexity, and breaks if the class hierarchy changes often (every new type needs updating on every existing visitor) — one of the least commonly needed patterns in practice; mostly shows up in compilers, AST processing, and structured document processing.</p>
   <pre><code>public interface IRoomVisitor {
-    void Visit(Kitchen k);
-    void Visit(Bathroom b);
+    void Visit(Kitchen kitchen);
+    void Visit(Bathroom bathroom);
+}
+public interface IRoom { void Accept(IRoomVisitor visitor); }
+
+public class Kitchen : IRoom {
+    public void Accept(IRoomVisitor visitor) => visitor.Visit(this);   // double dispatch
+}
+public class Bathroom : IRoom {
+    public void Accept(IRoomVisitor visitor) => visitor.Visit(this);
 }
 
+// add a whole new OPERATION without touching Kitchen or Bathroom at all:
 public class InspectionVisitor : IRoomVisitor {
     public void Visit(Kitchen k) => CheckFireSafety(k);
     public void Visit(Bathroom b) => CheckPlumbing(b);
 }
+public class CostEstimateVisitor : IRoomVisitor {
+    public void Visit(Kitchen k) => EstimateKitchenCost(k);
+    public void Visit(Bathroom b) => EstimateBathroomCost(b);
+}
 
-// each room just accepts the visitor:
-room.Accept(inspectionVisitor);</code></pre>
+foreach (var room in house.Rooms)
+    room.Accept(inspectionVisitor);       // swap visitors to run a totally different operation</code></pre>
 
   <div class="block-title">Mediator</div>
   <p><b>Define:</b> Centralize how a set of objects communicate, so they talk to a mediator instead of directly to each other — replacing a tangled many-to-many web of references with a hub-and-spoke structure. <b>Analogy:</b> An air traffic control tower — planes don't communicate directly with every other plane in the sky to coordinate landings; they all talk to the tower, which coordinates everyone. <b>My example:</b> MediatR in .NET is a direct, widely-used implementation of this — a controller sends a request through the mediator rather than directly calling multiple services and orchestrating them itself, decoupling the sender from needing to know every handler. <b>Trade-off:</b> The mediator itself can become a bloated "god object" if too much orchestration logic piles into it — same over-centralization risk as any hub-and-spoke design.</p>
@@ -248,20 +356,54 @@ return await _mediator.Send(new GetOrderQuery { Id = id });</code></pre>
   <div class="block-title">Iterator</div>
   <p><b>Define:</b> Provide a standard way to step through elements of a collection sequentially, without exposing the collection's internal structure to the code doing the iterating. <b>Analogy:</b> A TV remote's "channel up" button — you don't need to know how channels are stored or organized internally, you just press next and get the next one, in order. <b>My example:</b> C#'s <code>IEnumerable</code>/<code>foreach</code> and Java's <code>Iterator</code>/<code>for-each</code> are this pattern built directly into the language — you almost never implement it by hand, but recognizing it explains why custom collection types implementing these interfaces "just work" with foreach loops, LINQ, and streams.</p>
   <pre><code>public class WatchlistCollection : IEnumerable&lt;Entry&gt; {
+    private readonly List&lt;Entry&gt; _entries = new();
+    public void Add(Entry e) => _entries.Add(e);
+
+    // hides HOW entries are stored/traversed from every consumer
     public IEnumerator&lt;Entry&gt; GetEnumerator() => _entries.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-// "just works" with foreach, LINQ, everything:
-foreach (var entry in watchlist) { /* ... */ }</code></pre>
+var watchlist = new WatchlistCollection();
+watchlist.Add(new Entry("John Doe", "OFAC-SDN"));
+watchlist.Add(new Entry("Jane Smith", "UN"));
+
+// consumer never touches the internal List<Entry> directly —
+// "just works" with foreach, LINQ, .Where(), .Select(), everything:
+foreach (var entry in watchlist)
+    Console.WriteLine(entry.Name);
+
+var sdnOnly = watchlist.Where(e => e.Source == "OFAC-SDN").ToList();</code></pre>
 
   <div class="block-title">Memento</div>
   <p><b>Define:</b> Capture and externalize an object's internal state so it can be restored later, without violating encapsulation (the object itself controls what gets saved and restored, not external code reaching in). <b>Analogy:</b> A video game's save file — it captures enough state to restore your progress later, without the rest of the game needing to know or care about the internal save format. <b>My example:</b> Undo/redo functionality, or a form wizard that lets a user go "back" to a previous step with their data intact — each step's state is snapshotted as a memento before moving forward. <b>Trade-off:</b> Storing full state snapshots can be memory-expensive for large objects or long undo histories — often mitigated by storing diffs instead of full snapshots.</p>
-  <pre><code>public class FormState {                                   // the memento
+  <pre><code>// the Memento — an immutable snapshot, opaque to everyone but the Originator
+public class FormState {
     public Dictionary&lt;string, string&gt; Fields { get; init; }
 }
 
-var snapshot = new FormState { Fields = new(currentFields) };   // save
-currentFields = new(snapshot.Fields);                            // restore on "back"</code></pre>
+// the Originator — the thing whose state gets saved/restored
+public class MultiStepForm {
+    public Dictionary&lt;string, string&gt; Fields { get; private set; } = new();
+
+    public FormState Save() => new() { Fields = new(Fields) };       // snapshot now
+    public void Restore(FormState snapshot) => Fields = new(snapshot.Fields);
+}
+
+// the Caretaker — holds snapshots, never looks inside them
+public class UndoStack {
+    private readonly Stack&lt;FormState&gt; _history = new();
+    public void Push(FormState state) => _history.Push(state);
+    public FormState Pop() => _history.Pop();
+}
+
+var form = new MultiStepForm();
+var undoStack = new UndoStack();
+
+undoStack.Push(form.Save());     // before step 2, checkpoint step 1
+form.Fields["email"] = "jane@example.com";
+
+form.Restore(undoStack.Pop());   // user clicked "back" — step 1 state is fully restored</code></pre>
 
   <div class="say-box">
     <span class="lbl">Say this in interview</span>
