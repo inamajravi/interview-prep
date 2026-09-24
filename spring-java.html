@@ -25,7 +25,8 @@
   <a href="#aop">06 AOP</a>
   <a href="#security">07 Spring Security</a>
   <a href="#config">08 Profiles & Config</a>
-  <a href="#drill">09 Rapid Drill</a>
+  <a href="#deepqa">09 Deep-Dive Q&A</a>
+  <a href="#drill">10 Rapid Drill</a>
 </nav>
 
 <main>
@@ -319,8 +320,110 @@ public class ScreenController {
   </div>
 </section>
 
+<!-- DEEP DIVE Q&A -->
+<section class="panel" id="deepqa" data-index="09">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Deep-Dive Q&A — Spring Boot vs .NET Core</h2>
+  <div class="tagline">Full-sentence answers, side by side — the level of detail an interviewer actually wants to hear</div>
+
+  <div class="qa">
+    <div class="qa-item">
+      <div class="q">Q1: How does application bootstrapping work and start the embedded web server?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> <code>SpringApplication.run()</code> scans the classpath, configures beans automatically, and launches an embedded server (Tomcat/Jetty).<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>WebApplication.CreateBuilder(args)</code> sets up the host and DI container, while <code>app.Run()</code> boots up the embedded Kestrel web server.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q2: How do you handle cross-cutting concerns in the request pipeline?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Uses a two-tier approach: Servlet Filters for low-level container tasks (security/compression) and HandlerInterceptors for Spring MVC controller-level logic.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Uses a single, unified Middleware Pipeline (<code>app.Use...</code>) via <code>RequestDelegate</code> that handles both requests and responses sequentially.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q3: How do the built-in DI containers handle service lifetimes?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Managed by Spring IoC. Main scopes: Singleton (default), Prototype (new every time), Request, and Session.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Built-in container supports three primary lifetimes: Singleton (app lifetime), Scoped (per HTTP request), and Transient (new every time).
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q4: How do you bind configurations to classes with startup validation?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Uses <code>@ConfigurationProperties</code> paired with JSR-303 validation annotations (<code>@NotNull</code>) and <code>@Validated</code> to fail fast on errors.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Uses the Options Pattern (<code>IOptions&lt;T&gt;</code>) combined with <code>.ValidateDataAnnotations()</code> to bind and validate configuration values at startup.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q5: How do you execute background tasks or post-startup initialization?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Implement <code>CommandLineRunner</code> / <code>ApplicationRunner</code> for startup tasks, and use <code>@Async</code> or <code>@Scheduled</code> for background work.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Implement <code>BackgroundService</code> (inheriting from <code>IHostedService</code>) for long-running worker tasks that run alongside the web host.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q6: How do you handle exceptions globally, in one place, instead of try-catch in every controller?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> A class annotated <code>@ControllerAdvice</code> with methods annotated <code>@ExceptionHandler(SomeException.class)</code> intercepts exceptions thrown from any controller and maps them to a consistent error response.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Custom exception-handling middleware early in the pipeline (or the built-in <code>IExceptionHandler</code> interface from .NET 8+) catches unhandled exceptions and maps them to a consistent <code>ProblemDetails</code> response.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q7: What's the standard logging abstraction, and why does it matter that it's an abstraction?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> <code>SLF4J</code> as the facade, with Logback as the default underlying implementation — code depends only on the SLF4J interface, so the actual logging backend can be swapped without touching application code.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>Microsoft.Extensions.Logging</code>'s <code>ILogger&lt;T&gt;</code>, injected via DI — same idea, abstracting away whether logs go to console, a file, Application Insights, or Seq.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q8: How do you cache the result of an expensive method call declaratively?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> <code>@EnableCaching</code> on a configuration class, then <code>@Cacheable("cacheName")</code> directly on the method — Spring wraps the method in a caching proxy (AOP again) and skips the real call on a cache hit.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> No attribute-based equivalent built in — inject <code>IMemoryCache</code> (in-process) or <code>IDistributedCache</code> (Redis-backed) directly and call <code>GetOrCreateAsync</code> explicitly around the expensive call.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q9: How does the platform expose health/readiness status for load balancers and orchestrators (like EKS/AKS liveness probes)?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Spring Boot Actuator, adding a dependency exposes <code>/actuator/health</code> (and <code>/actuator/metrics</code>, <code>/actuator/info</code>) automatically, including per-dependency health indicators (DB, disk space, custom checks).<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> Built-in Health Checks middleware — <code>services.AddHealthChecks()</code> plus <code>app.MapHealthChecks("/health")</code>, with custom <code>IHealthCheck</code> implementations for per-dependency checks.
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q10: How does the framework support reactive, non-blocking streams of data — not just a single async result?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> Spring WebFlux, built on Project Reactor — <code>Mono&lt;T&gt;</code> for zero-or-one async value (the reactive equivalent of a Promise/Task), <code>Flux&lt;T&gt;</code> for zero-to-many values over time (the reactive equivalent of what Angular's Observables model, covered on the Angular Basics page).<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>IAsyncEnumerable&lt;T&gt;</code> with <code>await foreach</code> for a native async stream, or <code>System.Reactive</code> (Rx.NET)'s <code>IObservable&lt;T&gt;</code> for the fuller Reactor-equivalent feature set (operators, backpressure, combinators).
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="q">Q11: What library implements resilience patterns — retry, circuit breaker, timeout (from the Resilience Patterns page)?</div>
+      <div class="a">
+        <b style="color:var(--amber);">Java (Spring Boot):</b> <code>Resilience4j</code> — lightweight, modular, annotation-based (<code>@Retry</code>, <code>@CircuitBreaker</code>) or programmatic via a decorator API.<br><br>
+        <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>Polly</code> — fluent policy API (<code>Policy.Handle&lt;T&gt;().Retry()</code>), integrates directly with <code>HttpClientFactory</code> for per-named-client resilience policies.
+      </div>
+    </div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Almost every Spring Boot mechanism has a direct .NET Core counterpart — the differences are naming and exact API shape, not underlying concept. Where I'd pay closest attention switching between them: Spring's two-tier Filter/Interceptor split versus .NET's single unified middleware pipeline, and Spring's singleton-by-default bean scope versus .NET having no single default lifetime you must explicitly choose."</p>
+  </div>
+</section>
+
 <!-- DRILL -->
-<section class="panel" id="drill" data-index="09">
+<section class="panel" id="drill" data-index="10">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Rapid Recall Drill — the full mapping table</h2>
   <div class="tagline">Say the Spring term, then say the .NET equivalent, out loud</div>
