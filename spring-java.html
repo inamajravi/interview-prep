@@ -332,6 +332,24 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> <code>SpringApplication.run()</code> scans the classpath, configures beans automatically, and launches an embedded server (Tomcat/Jetty).<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>WebApplication.CreateBuilder(args)</code> sets up the host and DI container, while <code>app.Run()</code> boots up the embedded Kestrel web server.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+app.Run();</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -340,6 +358,29 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Uses a two-tier approach: Servlet Filters for low-level container tasks (security/compression) and HandlerInterceptors for Spring MVC controller-level logic.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Uses a single, unified Middleware Pipeline (<code>app.Use...</code>) via <code>RequestDelegate</code> that handles both requests and responses sequentially.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@Component
+public class LoggingFilter implements Filter {
+    public void doFilter(ServletRequest req, ServletResponse res,
+                          FilterChain chain) throws IOException, ServletException {
+        System.out.println("Before");
+        chain.doFilter(req, res);
+        System.out.println("After");
+    }
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>app.Use(async (context, next) => {
+    Console.WriteLine("Before");
+    await next();
+    Console.WriteLine("After");
+});</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -348,6 +389,20 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Managed by Spring IoC. Main scopes: Singleton (default), Prototype (new every time), Request, and Session.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Built-in container supports three primary lifetimes: Singleton (app lifetime), Scoped (per HTTP request), and Transient (new every time).
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@Service
+@Scope("prototype")   // new instance every injection
+public class ReportBuilder { }</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>builder.Services.AddTransient&lt;ReportBuilder&gt;();
+// new instance every injection</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -356,6 +411,25 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Uses <code>@ConfigurationProperties</code> paired with JSR-303 validation annotations (<code>@NotNull</code>) and <code>@Validated</code> to fail fast on errors.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Uses the Options Pattern (<code>IOptions&lt;T&gt;</code>) combined with <code>.ValidateDataAnnotations()</code> to bind and validate configuration values at startup.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@ConfigurationProperties(prefix = "app.mail")
+@Validated
+public class MailSettings {
+    @NotNull
+    private String host;
+    // getters/setters
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>builder.Services.AddOptions&lt;MailSettings&gt;()
+    .Bind(builder.Configuration.GetSection("Mail"))
+    .ValidateDataAnnotations();</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -364,6 +438,29 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Implement <code>CommandLineRunner</code> / <code>ApplicationRunner</code> for startup tasks, and use <code>@Async</code> or <code>@Scheduled</code> for background work.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Implement <code>BackgroundService</code> (inheriting from <code>IHostedService</code>) for long-running worker tasks that run alongside the web host.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@Component
+public class StartupTask implements CommandLineRunner {
+    public void run(String... args) {
+        System.out.println("App started!");
+    }
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>public class Worker : BackgroundService {
+    protected override async Task ExecuteAsync(CancellationToken ct) {
+        while (!ct.IsCancellationRequested) {
+            Console.WriteLine("Working...");
+            await Task.Delay(1000, ct);
+        }
+    }
+}</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -372,6 +469,28 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> A class annotated <code>@ControllerAdvice</code> with methods annotated <code>@ExceptionHandler(SomeException.class)</code> intercepts exceptions thrown from any controller and maps them to a consistent error response.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Custom exception-handling middleware early in the pipeline (or the built-in <code>IExceptionHandler</code> interface from .NET 8+) catches unhandled exceptions and maps them to a consistent <code>ProblemDetails</code> response.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@ControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity&lt;String&gt; handle(NotFoundException ex) {
+        return ResponseEntity.status(404).body(ex.getMessage());
+    }
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>app.UseExceptionHandler(errorApp => {
+    errorApp.Run(async context => {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsync("Not found");
+    });
+});</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -380,6 +499,26 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> <code>SLF4J</code> as the facade, with Logback as the default underlying implementation — code depends only on the SLF4J interface, so the actual logging backend can be swapped without touching application code.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>Microsoft.Extensions.Logging</code>'s <code>ILogger&lt;T&gt;</code>, injected via DI — same idea, abstracting away whether logs go to console, a file, Application Insights, or Seq.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>private static final Logger log =
+    LoggerFactory.getLogger(MyService.class);
+
+log.info("User {} logged in", userId);</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>public class MyService {
+    private readonly ILogger&lt;MyService&gt; _logger;
+    public MyService(ILogger&lt;MyService&gt; logger) => _logger = logger;
+
+    void DoWork(int userId) =>
+        _logger.LogInformation("User {UserId} logged in", userId);
+}</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -388,6 +527,22 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> <code>@EnableCaching</code> on a configuration class, then <code>@Cacheable("cacheName")</code> directly on the method — Spring wraps the method in a caching proxy (AOP again) and skips the real call on a cache hit.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> No attribute-based equivalent built in — inject <code>IMemoryCache</code> (in-process) or <code>IDistributedCache</code> (Redis-backed) directly and call <code>GetOrCreateAsync</code> explicitly around the expensive call.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@Cacheable("users")
+public User getUser(int id) {
+    return userRepository.findById(id);
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>var user = await cache.GetOrCreateAsync($"user-{id}",
+    async entry => await userRepository.FindByIdAsync(id));
+// no attribute equivalent — call it explicitly</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -396,6 +551,22 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Spring Boot Actuator, adding a dependency exposes <code>/actuator/health</code> (and <code>/actuator/metrics</code>, <code>/actuator/info</code>) automatically, including per-dependency health indicators (DB, disk space, custom checks).<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> Built-in Health Checks middleware — <code>services.AddHealthChecks()</code> plus <code>app.MapHealthChecks("/health")</code>, with custom <code>IHealthCheck</code> implementations for per-dependency checks.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code># application.properties
+management.endpoints.web.exposure.include=health
+
+# GET /actuator/health -> {"status":"UP"}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>builder.Services.AddHealthChecks();
+app.MapHealthChecks("/health");
+// GET /health -> Healthy</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -404,6 +575,26 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> Spring WebFlux, built on Project Reactor — <code>Mono&lt;T&gt;</code> for zero-or-one async value (the reactive equivalent of a Promise/Task), <code>Flux&lt;T&gt;</code> for zero-to-many values over time (the reactive equivalent of what Angular's Observables model, covered on the Angular Basics page).<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>IAsyncEnumerable&lt;T&gt;</code> with <code>await foreach</code> for a native async stream, or <code>System.Reactive</code> (Rx.NET)'s <code>IObservable&lt;T&gt;</code> for the fuller Reactor-equivalent feature set (operators, backpressure, combinators).
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>Flux&lt;Integer&gt; numbers = Flux.just(1, 2, 3)
+    .map(n -&gt; n * 2);
+
+numbers.subscribe(System.out::println);
+// 2, 4, 6</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>async IAsyncEnumerable&lt;int&gt; GetNumbers() {
+    for (int i = 1; i &lt;= 3; i++) yield return i * 2;
+}
+
+await foreach (var n in GetNumbers())
+    Console.WriteLine(n);   // 2, 4, 6</code></pre>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -412,6 +603,23 @@ public class ScreenController {
       <div class="a">
         <b style="color:var(--amber);">Java (Spring Boot):</b> <code>Resilience4j</code> — lightweight, modular, annotation-based (<code>@Retry</code>, <code>@CircuitBreaker</code>) or programmatic via a decorator API.<br><br>
         <b style="color:var(--blue-line);">.NET (.NET Core):</b> <code>Polly</code> — fluent policy API (<code>Policy.Handle&lt;T&gt;().Retry()</code>), integrates directly with <code>HttpClientFactory</code> for per-named-client resilience policies.
+      
+      <div class="side-by-side" style="margin-top:14px;">
+        <div class="code-col">
+          <span class="lbl">Java</span>
+          <pre><code>@Retry(name = "backendA", fallbackMethod = "fallback")
+public String callBackend() {
+    return restTemplate.getForObject(url, String.class);
+}</code></pre>
+        </div>
+        <div class="code-col">
+          <span class="lbl">.NET</span>
+          <pre><code>var policy = Policy.Handle&lt;HttpRequestException&gt;()
+    .RetryAsync(3);
+
+await policy.ExecuteAsync(() => httpClient.GetAsync(url));</code></pre>
+        </div>
+      </div>
       </div>
     </div>
   </div>
