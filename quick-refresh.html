@@ -75,6 +75,7 @@
   <a href="#distributed">Distributed Systems</a>
   <a href="#patterns">Patterns</a>
   <a href="#architecture">Architecture</a>
+  <a href="#refarch">Reference Architecture</a>
   <a href="#dotnetspring">.NET / Spring</a>
   <a href="#javapractice">Java Streams/Concurrency</a>
   <a href="#obsvspromise">Observables vs Promises</a>
@@ -152,6 +153,18 @@
     <div class="chip"><b>Saga</b>Chain of local transactions + explicit compensating "undo" steps.</div>
     <div class="chip"><b>DDD</b>Business language in code; Bounded Contexts seed microservice boundaries.</div>
     <div class="chip"><b>Choreography vs Orchestration</b>Orchestrate once steps exceed ~4, for observability.</div>
+  </div>
+</div>
+
+<div class="mini-panel" id="refarch">
+  <h3><span class="n">02a</span> Microservices Reference Architecture</h3>
+  <div class="refresh-grid">
+    <div class="chip"><b>Hard vs Soft dependency</b>The core question: "if this silently failed and we proceeded, what's the cost?" — UX = soft, money/compliance = hard.</div>
+    <div class="chip"><b>Hard dependencies fail-closed</b>Payment→Sanctions Screening never falls back to "skip and approve" — hold, bounded retry, clean failure.</div>
+    <div class="chip"><b>Soft dependencies degrade gracefully</b>Reviews/Search down → page renders without them, checkout unaffected.</div>
+    <div class="chip"><b>JWKS caching</b>Turns a hard Identity dependency into one that tolerates real outages — no live call needed per request.</div>
+    <div class="chip"><b>Hard requirement, soft timing</b>Shipping must happen eventually but doesn't need to block checkout — queued + retried, not truly "soft."</div>
+    <div class="chip"><b>Resilience = performance</b>Moving Notification/Analytics off the sync path removes their latency from checkout too, not just their outage risk.</div>
   </div>
 </div>
 

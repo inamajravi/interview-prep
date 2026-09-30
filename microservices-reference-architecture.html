@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microservices Reference Architecture — Interview Blueprint</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  table.svc{width:100%; border-collapse:collapse; margin:16px 0; font-size:13px;}
+  table.svc th{
+    font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px;
+    color:var(--amber); text-align:left; padding:9px 10px; border-bottom:2px solid rgba(242,165,65,0.4);
+  }
+  table.svc td{padding:9px 10px; border-bottom:1px solid rgba(142,205,221,0.15); vertical-align:top;}
+  table.svc tr:hover td{background:rgba(142,205,221,0.05);}
+  table.svc td:first-child{font-weight:600; color:var(--paper); white-space:nowrap;}
+  .diagram{
+    background:#081A30; border:1px solid rgba(142,205,221,0.3); border-radius:4px;
+    padding:18px; overflow-x:auto; margin:16px 0;
+  }
+  .diagram pre{background:none; border:none; padding:0; margin:0; font-size:11.5px; line-height:1.4; color:#B8DCE8;}
+  .hard{color:var(--red); font-weight:600;}
+  .soft{color:var(--green); font-weight:600;}
+  .step{
+    border-left:3px solid var(--blue-line); padding:10px 16px; margin:10px 0;
+    background:rgba(142,205,221,0.04);
+  }
+  .step.fail{border-left-color:var(--red); background:rgba(226,104,90,0.06);}
+  .step.fallback{border-left-color:var(--green); background:rgba(76,175,136,0.06);}
+  .step .steplabel{font-family:var(--mono); font-size:11px; color:var(--slate); text-transform:uppercase; letter-spacing:0.5px;}
+</style>
+</head>
+<body>
+<header>
+  <a class="backlink" href="index.html">← Back to Hub</a>
+  <div class="eyebrow" style="margin-top:14px;">Blueprint 23 / Reference Architecture</div>
+  <h1>Microservices Reference Architecture</h1>
+  <p>13 services, one realistic e-commerce + payments platform — built specifically to answer "how do dependent services keep working when something else is down," with an explicit distinction between what's allowed to degrade and what absolutely cannot.</p>
+  <div class="stamp">HIGH PERFORMANCE → FAULT TOLERANCE → FALLBACKS → INTER-SERVICE RESILIENCE</div>
+</header>
+<nav>
+  <a href="#services">01 The 13 Services</a>
+  <a href="#diagram">02 Architecture Diagram</a>
+  <a href="#communication">03 Communication Patterns</a>
+  <a href="#harddep">04 The Core Principle: Hard vs Soft Dependencies</a>
+  <a href="#matrix">05 Fault Tolerance & Fallback Matrix</a>
+  <a href="#walkthrough">06 Checkout Flow — Failure Walkthroughs</a>
+  <a href="#performance">07 High-Performance Techniques</a>
+  <a href="#drill">08 Rapid Drill</a>
+</nav>
+<main>
+
+<section class="panel" id="services" data-index="01">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The 13 Services</h2>
+  <div class="tagline">Each one, its actual job, and what it's built on</div>
+
+  <table class="svc">
+    <tr><th>Service</th><th>Responsibility</th><th>Data Store</th></tr>
+    <tr><td>API Gateway</td><td>Single entry point — routing, rate limiting, TLS termination, JWT validation</td><td>None (stateless)</td></tr>
+    <tr><td>Identity Service</td><td>Authentication, token issuance (OIDC), user credentials</td><td>PostgreSQL</td></tr>
+    <tr><td>User Profile Service</td><td>Profile data, addresses, preferences</td><td>PostgreSQL</td></tr>
+    <tr><td>Product Catalog Service</td><td>Product data, pricing, descriptions</td><td>PostgreSQL + Redis (read cache)</td></tr>
+    <tr><td>Search Service</td><td>Full-text/faceted product search</td><td>Elasticsearch (async-indexed from Catalog)</td></tr>
+    <tr><td>Inventory Service</td><td>Stock levels, reservation holds</td><td>PostgreSQL (strongly consistent)</td></tr>
+    <tr><td>Order Service</td><td>Orchestrates the checkout Saga; owns order state</td><td>PostgreSQL</td></tr>
+    <tr><td>Payment Service</td><td>Charges, refunds, payment method vaulting</td><td>PostgreSQL (PCI-scoped, isolated)</td></tr>
+    <tr><td>Sanctions/Fraud Screening Service</td><td>Screens every transaction against watchlists before it's allowed to settle</td><td>PostgreSQL + in-memory watchlist index</td></tr>
+    <tr><td>Notification Service</td><td>Email/SMS/push — order confirmations, shipping updates</td><td>None (stateless, queue-driven)</td></tr>
+    <tr><td>Shipping/Fulfillment Service</td><td>Warehouse routing, carrier integration, tracking</td><td>PostgreSQL</td></tr>
+    <tr><td>Review/Rating Service</td><td>Product reviews and star ratings</td><td>PostgreSQL + Redis (aggregate cache)</td></tr>
+    <tr><td>Analytics/Reporting Service</td><td>Business dashboards, funnel metrics — consumes events, never blocks anything</td><td>Data warehouse (batch/streaming ingest)</td></tr>
+  </table>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I'd deliberately design each service around a single business capability with its own data store — no shared database between services — which is what actually makes independent deployment and independent failure possible in the first place. The Sanctions Screening service being isolated from Payment, specifically, isn't incidental — it needs its own scaling profile and its own compliance boundary."</p>
+  </div>
+</section>
+
+<section class="panel" id="diagram" data-index="02">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Architecture Diagram</h2>
+  <div class="tagline">Request flow from client to every downstream service</div>
+
+  <div class="diagram">
+<pre>                                  ┌──────────────────┐
+                                  │    API Gateway    │
+                                  │ (routing / authN) │
+                                  └─────────┬──────────┘
+                     ┌─────────────────────┼─────────────────────┐
+                     │                     │                     │
+             ┌───────▼───────┐   ┌─────────▼─────────┐   ┌───────▼────────┐
+             │Identity Service│   │Product Catalog Svc │   │  Search Svc    │
+             │    (OIDC)      │   │  (Redis cached)     │◄──┤ (Elasticsearch)│
+             └────────────────┘   └─────────┬───────────┘   └────────────────┘
+                                             │
+                                   ┌─────────▼──────────┐
+                                   │    Order Service     │  ◄── orchestrates the
+                                   │  (checkout Saga)      │      checkout Saga
+                                   └──┬────────┬─────┬───┘
+                    ┌─────────────────┘        │     └──────────────────┐
+                    │                          │                        │
+            ┌───────▼────────┐      ┌──────────▼─────────┐     ┌────────▼────────┐
+            │ Inventory Svc   │      │  Payment Service     │────▶ Sanctions/Fraud │
+            │ (strong consist)│      │  (PCI-scoped)         │     │ Screening Svc   │
+            └─────────────────┘      └──────────┬────────────┘     └─────────────────┘
+                                                 │
+                                   ┌─────────────┴──────────────┐
+                                   │                             │
+                          ┌────────▼────────┐          ┌─────────▼─────────┐
+                          │ Notification Svc │          │ Shipping/Fulfillment│
+                          │  (async, SQS)     │          │      Service         │
+                          └───────────────────┘          └──────────────────────┘
+
+             ┌─────────────────┐                          ┌───────────────────────┐
+             │ Review/Rating Svc│                          │ Analytics/Reporting    │
+             │  (non-blocking)   │                          │ (event-stream, async)  │
+             └───────────────────┘                          └────────────────────────┘
+
+  Legend:  ──▶ synchronous call (blocking)      ┄┄▶ asynchronous event (non-blocking)</pre>
+  </div>
+
+  <p style="font-size:13.5px; color:var(--slate);">This is deliberately drawn with solid lines only for the calls that are genuinely synchronous and blocking — Order → Inventory, Order → Payment, Payment → Sanctions Screening. Everything reaching Notification, Analytics, and most of Review/Search is event-driven and non-blocking, which is exactly what makes them safe to be down without affecting checkout at all — covered in detail in the next two sections.</p>
+</section>
+
+<section class="panel" id="communication" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Communication Patterns</h2>
+  <div class="tagline">Sync vs async isn't a style choice — it's decided by whether the caller needs to know the outcome before proceeding</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Synchronous (REST/gRPC) — used for</span>Order → Inventory (must know stock is reserved before proceeding), Order → Payment (must know the charge succeeded), Payment → Sanctions Screening (must know the transaction is clear before settling funds). All three are cases where the caller genuinely cannot proceed without the answer.</div>
+    <div class="avoid-box"><span class="lbl">Asynchronous (events via SNS/SQS) — used for</span>Order → Notification, Order → Analytics, Catalog → Search indexing, any "→ Review/Rating" display calls. None of these need to block the caller — the checkout succeeding doesn't depend on the confirmation email being sent yet.</div>
+  </div>
+
+  <p style="font-size:14px;">Internal service-to-service synchronous calls use <b>gRPC</b> rather than REST/JSON specifically for the high-performance requirement — binary protobuf serialization and HTTP/2 multiplexing measurably reduce latency over JSON-over-HTTP/1.1 for high-volume internal traffic, while the public-facing API Gateway still exposes REST/JSON externally where broad client compatibility matters more than raw throughput.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I decide sync vs async by one question: does the caller need the answer before it can correctly proceed? If yes — reserving inventory, charging a card, clearing a sanctions check — it's synchronous, because pretending otherwise just moves the problem somewhere less visible. If no — a confirmation email, an analytics event — it's async by default, because there's no reason to couple the caller's success to it."</p>
+  </div>
+</section>
+
+<section class="panel" id="harddep" data-index="04">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>The Core Principle: Hard vs Soft Dependencies</h2>
+  <div class="tagline">This is the actual answer to "how do services keep working when a dependency is down" — the honest answer is: not all of them do, and that's correct</div>
+
+  <p>The instinct "every service should have a fallback so nothing ever fails" is wrong for this domain, and saying so explicitly is a stronger interview answer than pretending otherwise. Some dependencies are <span class="hard">HARD</span> — the calling service <i>cannot</i> safely proceed without them, and the correct behavior is to fail the request cleanly (fail-closed). Others are <span class="soft">SOFT</span> — the calling service can degrade gracefully and continue without them (fail-open).</p>
+
+  <div class="tradeoff-grid">
+    <div class="avoid-box"><span class="lbl hard">Hard dependency example</span>Payment Service calling Sanctions Screening. If Screening is down, Payment Service <b>must not</b> fall back to "skip the check and approve anyway" — that's a compliance and legal failure, not a resilience win. The correct behavior is to hold the transaction in a pending state, retry, and fail the checkout cleanly with a clear "try again shortly" if screening stays unavailable past a timeout.</div>
+    <div class="use-box"><span class="lbl soft">Soft dependency example</span>Product page calling Review/Rating Service. If Reviews is down, the product page renders completely fine without the reviews section — the core purchase flow was never blocked by a dependency that was never actually required to complete a purchase.</div>
+  </div>
+
+  <div class="block-title">The question that decides which one a dependency is</div>
+  <p style="font-size:14.5px;"><b>"If this call silently failed and we proceeded anyway, what's the actual cost?"</b> — if the answer is "a slightly worse user experience" (no reviews, no recommendations, a stale search index), it's soft — degrade gracefully. If the answer is "money moved that shouldn't have, or a sanctioned entity got paid," it's hard — fail closed, every time, no exceptions, regardless of how good the circuit breaker's fallback story sounds in the abstract.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"I explicitly classify every dependency as hard or soft before designing its failure behavior — it's the single most important architectural decision in a fault-tolerant system, and it's also the one place where 'just add a circuit breaker with a fallback' is actually the wrong answer if applied blindly. A circuit breaker's fallback for a hard dependency should be 'fail the request cleanly,' not 'proceed with a default value' — proceeding with a default is exactly correct for a soft dependency and exactly wrong for a hard one."</p>
+  </div>
+</section>
+
+<section class="panel" id="matrix" data-index="05">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Fault Tolerance & Fallback Matrix</h2>
+  <div class="tagline">Every real dependency in the diagram, what happens if it's down, and which pattern from the Resilience Patterns page handles it</div>
+
+  <table class="svc">
+    <tr><th>Caller → Dependency</th><th>Type</th><th>If the Dependency Is Down</th><th>Pattern Used</th></tr>
+    <tr>
+      <td>Order → Inventory</td>
+      <td class="hard">HARD</td>
+      <td>Circuit breaker opens after threshold failures; checkout fails cleanly with "try again" rather than accepting an order for stock that can't be confirmed reserved.</td>
+      <td>Circuit breaker + timeout</td>
+    </tr>
+    <tr>
+      <td>Order → Payment</td>
+      <td class="hard">HARD</td>
+      <td>Retry with exponential backoff for transient failures; circuit breaker opens for sustained outages; order held in "payment-pending" state, never silently marked paid.</td>
+      <td>Retry + circuit breaker + Saga compensating step</td>
+    </tr>
+    <tr>
+      <td>Payment → Sanctions Screening</td>
+      <td class="hard">HARD</td>
+      <td><b>Never</b> falls back to skipping the check. Transaction held, bounded retry, and a clean failure if Screening stays unavailable past the timeout — fail-closed by design.</td>
+      <td>Fail-closed + bounded retry, no fallback path</td>
+    </tr>
+    <tr>
+      <td>API Gateway → Identity (token validation)</td>
+      <td class="hard" style="color:var(--amber);">HARD (mitigated)</td>
+      <td>Gateway caches the Identity Service's public signing keys (JWKS) locally — most token validations don't need a live call at all, so brief Identity outages barely register.</td>
+      <td>Local JWKS cache — turns a hard dependency into one that tolerates real outages</td>
+    </tr>
+    <tr>
+      <td>Order → Notification</td>
+      <td class="soft">SOFT</td>
+      <td>Fire-and-forget via SQS. Checkout completes regardless; the notification is delivered whenever the service recovers — eventually consistent, never blocking.</td>
+      <td>Async decoupling via message queue</td>
+    </tr>
+    <tr>
+      <td>Catalog → Search (indexing)</td>
+      <td class="soft">SOFT</td>
+      <td>Search index falls behind if Search/indexing is down; Catalog's own DB-backed basic query still works as a degraded fallback for product lookups.</td>
+      <td>Graceful degradation to a simpler direct query</td>
+    </tr>
+    <tr>
+      <td>Any Service → Redis Cache</td>
+      <td class="soft">SOFT</td>
+      <td>Cache-aside pattern falls back to reading directly from the database — slower, but fully functional. Cache is treated as a pure optimization, never a hard requirement.</td>
+      <td>Cache-aside with DB fallback</td>
+    </tr>
+    <tr>
+      <td>Product Page → Review/Rating</td>
+      <td class="soft">SOFT</td>
+      <td>Page renders fully without the reviews section; a short timeout plus bulkhead isolation ensures a slow Review service can't tie up threads needed for the actual purchase flow.</td>
+      <td>Bulkhead + timeout + UI-level graceful degradation</td>
+    </tr>
+    <tr>
+      <td>Order → Shipping/Fulfillment</td>
+      <td class="hard" style="color:var(--amber);">HARD (deferred)</td>
+      <td>Order is accepted and payment/screening already cleared — shipping dispatch is queued asynchronously rather than blocking checkout, with retry until Fulfillment confirms receipt.</td>
+      <td>Async queue with guaranteed delivery — hard requirement, soft timing</td>
+    </tr>
+  </table>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The Fulfillment row is a good example of a nuance beyond simple hard/soft — shipping dispatch genuinely must happen eventually, so it's not optional the way reviews are, but it doesn't need to happen synchronously within the checkout request either. I'd call that a hard requirement with soft timing — queued reliably, retried until confirmed, but never blocking the customer's checkout response."</p>
+  </div>
+</section>
+
+<section class="panel" id="walkthrough" data-index="06">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Checkout Flow — Failure Walkthroughs</h2>
+  <div class="tagline">Same request, three different failure scenarios, traced step by step</div>
+
+  <div class="block-title">Scenario A: Happy path</div>
+  <div class="step"><span class="steplabel">1. Client → API Gateway</span><br>Request authenticated via cached JWKS — no live Identity Service call needed.</div>
+  <div class="step"><span class="steplabel">2. Order Service starts the checkout Saga</span><br>Calls Inventory (reserve stock) → Payment (charge card) → Payment calls Sanctions Screening (clear the transaction) → all synchronous, all succeed.</div>
+  <div class="step"><span class="steplabel">3. Order confirmed, response returned to client</span><br>Order Service publishes an "OrderPlaced" event.</div>
+  <div class="step"><span class="steplabel">4. Async fan-out</span><br>Notification Service sends confirmation email; Analytics records the event; Fulfillment picks up the shipping job — none of this delays the response the customer already received.</div>
+
+  <div class="block-title">Scenario B: Review Service is down (soft dependency)</div>
+  <div class="step fallback"><span class="steplabel">Impact</span><br>Zero impact on checkout. The product page the customer browsed earlier simply rendered without a reviews section — a bulkhead-isolated timeout ensured that slow/down Review calls never consumed resources the checkout flow needed. The customer completes their purchase with no idea anything was degraded.</div>
+
+  <div class="block-title">Scenario C: Payment Service is down (hard dependency)</div>
+  <div class="step fail"><span class="steplabel">1. Order Service calls Payment</span><br>Fails — retried twice with exponential backoff, both fail. Circuit breaker opens after the threshold.</div>
+  <div class="step fail"><span class="steplabel">2. Order held, not silently failed or silently succeeded</span><br>Order Service's Saga executes the compensating step: the Inventory reservation from step earlier is released (so stock isn't held hostage by a stuck order), and the order is marked "payment-failed — please retry."</div>
+  <div class="step"><span class="steplabel">3. Customer sees a clear, honest error</span><br>Not a silent failure, not a false success — a real "something went wrong, please try again" with the reservation correctly released behind the scenes.</div>
+
+  <div class="block-title">Scenario D: Sanctions Screening Service is down (hard dependency, zero fallback)</div>
+  <div class="step fail"><span class="steplabel">1. Payment Service attempts the charge</span><br>Card authorization succeeds — but Payment Service will not settle/capture funds until Screening clears the transaction.</div>
+  <div class="step fail"><span class="steplabel">2. Screening call fails, bounded retry also fails</span><br>Unlike the Payment scenario above, there is no acceptable fallback here — Payment Service does <b>not</b> proceed with settlement.</div>
+  <div class="step"><span class="steplabel">3. Transaction held in "pending-screening," authorization voided if it exceeds a bounded window</span><br>The customer sees "your order is being processed" rather than either a false success or a confusing hard failure — and no funds are ever captured without a clean pass through Screening. This is the one path in the entire system with genuinely zero fallback, by design.</div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"Scenario D is the one I'd lead with if asked to demonstrate real fault-tolerance thinking, not just pattern-matching 'add a circuit breaker everywhere.' The sophisticated answer isn't that every dependency has a graceful fallback — it's knowing precisely which one dependency in the entire system is not allowed to have one, and designing its failure mode to be safe by construction rather than convenient."</p>
+  </div>
+</section>
+
+<section class="panel" id="performance" data-index="07">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>High-Performance Techniques</h2>
+  <div class="tagline">Where the real latency and throughput wins come from across this architecture</div>
+
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">Read replicas + cache-aside (Redis)</span>Catalog and Search reads are the highest-volume, most read-heavy traffic in the system — serving them from replicas and a cache layer keeps the primary write databases free for the transactional paths (Order, Payment) that actually need strong consistency.</div>
+    <div class="avoid-box"><span class="lbl">gRPC for internal service-to-service calls</span>Binary protobuf + HTTP/2 multiplexing meaningfully reduces latency over JSON/REST for the high-volume internal traffic between Order, Inventory, and Payment — while the Gateway still exposes REST externally for broad client compatibility.</div>
+  </div>
+  <div class="tradeoff-grid">
+    <div class="use-box"><span class="lbl">CQRS on Order Service</span>Order writes (placing an order) go through the full Saga and validation path; order history/dashboard reads are served from a separate, denormalized read model — exactly the CQRS pattern from the Architecture page, applied because write and read shapes here genuinely diverge.</div>
+    <div class="avoid-box"><span class="lbl">Async everything that doesn't need to block</span>Notification, Analytics, and Search indexing are entirely event-driven — moving them off the synchronous critical path is as much a performance win as a resilience one, since the checkout response time no longer includes any of their latency at all.</div>
+  </div>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"A lot of the performance story here is really the same decision as the fault-tolerance story, seen from a different angle — moving Notification, Analytics, and Search off the synchronous path doesn't just protect checkout from their outages, it also removes their latency from the checkout response time entirely. Resilience and performance point in the same direction more often than people expect."</p>
+  </div>
+</section>
+
+<section class="panel" id="drill" data-index="08">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Rapid Recall Drill</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="q">What's the single question that decides if a dependency is hard or soft?</div><div class="a">"If this call silently failed and we proceeded anyway, what's the actual cost?" — a worse UX means soft; money moving incorrectly or a compliance breach means hard.</div></div>
+    <div class="qa-item"><div class="q">Why doesn't Payment Service fall back to "skip screening and approve anyway" when Sanctions Screening is down?</div><div class="a">That's not resilience, it's a compliance failure — the correct behavior is fail-closed: hold the transaction, bounded retry, then a clean failure, never a silent bypass.</div></div>
+    <div class="qa-item"><div class="q">How does the API Gateway keep validating tokens even if Identity Service is briefly down?</div><div class="a">It caches Identity's public signing keys (JWKS) locally — most validations don't need a live call, turning a hard dependency into one that tolerates real outages.</div></div>
+    <div class="qa-item"><div class="q">What happens to an Inventory reservation if Payment subsequently fails?</div><div class="a">The Saga's compensating step releases the reservation — this is exactly the Saga pattern from the Architecture page: local transactions plus explicit compensating actions on failure.</div></div>
+    <div class="qa-item"><div class="q">Why is Review/Rating a soft dependency but Fulfillment is not, even though both are "downstream" of checkout?</div><div class="a">Reviews never need to happen at all for a valid purchase — pure UX. Shipping dispatch genuinely must happen eventually — it's a hard requirement, just with soft (asynchronous) timing, not a true soft dependency.</div></div>
+  </div>
+</section>
+
+</main>
+<footer>BLUEPRINT 23 — MICROSERVICES REFERENCE ARCHITECTURE · Interview Prep Series</footer>
+</body>
+</html>
