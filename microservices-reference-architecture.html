@@ -41,12 +41,13 @@
 <nav>
   <a href="#services">01 The 13 Services</a>
   <a href="#diagram">02 Architecture Diagram</a>
-  <a href="#communication">03 Communication Patterns</a>
-  <a href="#harddep">04 The Core Principle: Hard vs Soft Dependencies</a>
-  <a href="#matrix">05 Fault Tolerance & Fallback Matrix</a>
-  <a href="#walkthrough">06 Checkout Flow — Failure Walkthroughs</a>
-  <a href="#performance">07 High-Performance Techniques</a>
-  <a href="#drill">08 Rapid Drill</a>
+  <a href="#infra">03 Infrastructure Components</a>
+  <a href="#communication">04 Communication Patterns</a>
+  <a href="#harddep">05 The Core Principle: Hard vs Soft Dependencies</a>
+  <a href="#matrix">06 Fault Tolerance & Fallback Matrix</a>
+  <a href="#walkthrough">07 Checkout Flow — Failure Walkthroughs</a>
+  <a href="#performance">08 High-Performance Techniques</a>
+  <a href="#drill">09 Rapid Drill</a>
 </nav>
 <main>
 
@@ -81,50 +82,95 @@
 <section class="panel" id="diagram" data-index="02">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Architecture Diagram</h2>
-  <div class="tagline">Request flow from client to every downstream service</div>
+  <div class="tagline">Request flow from client through every infrastructure layer to every downstream service — Load Balancer, cache, SNS/SQS fan-out, and DLQs included</div>
 
   <div class="diagram">
-<pre>                                  ┌──────────────────┐
-                                  │    API Gateway    │
-                                  │ (routing / authN) │
-                                  └─────────┬──────────┘
-                     ┌─────────────────────┼─────────────────────┐
-                     │                     │                     │
-             ┌───────▼───────┐   ┌─────────▼─────────┐   ┌───────▼────────┐
-             │Identity Service│   │Product Catalog Svc │   │  Search Svc    │
-             │    (OIDC)      │   │  (Redis cached)     │◄──┤ (Elasticsearch)│
-             └────────────────┘   └─────────┬───────────┘   └────────────────┘
-                                             │
-                                   ┌─────────▼──────────┐
-                                   │    Order Service     │  ◄── orchestrates the
-                                   │  (checkout Saga)      │      checkout Saga
-                                   └──┬────────┬─────┬───┘
-                    ┌─────────────────┘        │     └──────────────────┐
-                    │                          │                        │
-            ┌───────▼────────┐      ┌──────────▼─────────┐     ┌────────▼────────┐
-            │ Inventory Svc   │      │  Payment Service     │────▶ Sanctions/Fraud │
-            │ (strong consist)│      │  (PCI-scoped)         │     │ Screening Svc   │
-            └─────────────────┘      └──────────┬────────────┘     └─────────────────┘
-                                                 │
-                                   ┌─────────────┴──────────────┐
-                                   │                             │
-                          ┌────────▼────────┐          ┌─────────▼─────────┐
-                          │ Notification Svc │          │ Shipping/Fulfillment│
-                          │  (async, SQS)     │          │      Service         │
-                          └───────────────────┘          └──────────────────────┘
+<pre>  Client
+    │
+    ▼
+┌───────────────────┐
+│   Load Balancer     │   (ALB — Layer 7, multi-AZ, health-checked targets)
+└─────────┬────────────┘
+          │
+┌─────────▼────────┐
+│    API Gateway      │   (routing / authN via cached JWKS / rate limiting)
+└─────────┬────────────┘
+          │
+┌─────────┼─────────────────────────┐
+│         │                         │
+┌─────────▼────────┐    ┌───────────▼───────────┐   ┌────────────────┐
+│ Identity Service    │    │  Product Catalog Svc    │──▶│  Search Svc      │
+│    (OIDC)            │    │                          │   │ (Elasticsearch)  │
+└───────────────────────┘    └───────────┬──────────────┘   └──────────────────┘
+                                          │
+                              ┌───────────▼────────────┐
+                              │     Redis Cache            │  ◄── shared layer:
+                              │    (ElastiCache cluster)     │      Catalog, Search,
+                              └─────────────────────────────┘      Review all read/write here
+                                          │
+                              ┌───────────▼─────────────┐
+                              │      Order Service           │  ◄── orchestrates
+                              │    (checkout Saga)            │      the checkout Saga
+                              └──┬────────────┬─────────┬────┘
+              ┌───────────────────┘             │          └───────────────────┐
+              │                                  │                              │
+    ┌─────────▼─────────┐            ┌───────────▼────────────┐      ┌─────────▼──────────┐
+    │  Inventory Service   │            │    Payment Service        │──▶│  Sanctions/Fraud      │
+    │  (strong consistency)│            │     (PCI-scoped)           │   │  Screening Service    │
+    └───────────────────────┘            └────────────┬────────────────┘   └────────────────────────┘
+                                                        │
+                                             publishes "OrderPlaced"
+                                                        │
+                                           ┌────────────▼─────────────┐
+                                           │       SNS Topic               │
+                                           │     "order-events"             │
+                                           └──┬─────────────┬────────┬────┘
+                      ┌─────────────────────────┘             │         └──────────────────────┐
+                      │                                        │                                  │
+          ┌───────────▼────────────┐              ┌────────────▼─────────────┐         ┌──────────▼──────────────┐
+          │  SQS: notification-queue   │              │  SQS: fulfillment-queue     │         │  SQS: analytics-queue       │
+          │  (→ Notification Service)   │              │  (→ Shipping/Fulfillment)    │         │  (→ Analytics/Reporting)     │
+          └───────────┬────────────────┘              └────────────┬─────────────────┘         └──────────┬──────────────────┘
+                      │ after 3 failed                              │ after 3 failed                       │ after 3 failed
+                      │ receive attempts                            │ receive attempts                     │ receive attempts
+          ┌───────────▼────────────┐              ┌────────────▼─────────────┐         ┌──────────▼──────────────┐
+          │  DLQ: notification-dlq     │              │  DLQ: fulfillment-dlq        │         │  DLQ: analytics-dlq          │
+          │  (CloudWatch alarm on depth) │              │  (CloudWatch alarm on depth)   │         │  (CloudWatch alarm on depth)   │
+          └─────────────────────────────┘              └───────────────────────────────┘         └──────────────────────────────┘
 
-             ┌─────────────────┐                          ┌───────────────────────┐
-             │ Review/Rating Svc│                          │ Analytics/Reporting    │
-             │  (non-blocking)   │                          │ (event-stream, async)  │
-             └───────────────────┘                          └────────────────────────┘
-
-  Legend:  ──▶ synchronous call (blocking)      ┄┄▶ asynchronous event (non-blocking)</pre>
+  Legend:  ──▶ synchronous call (blocking, waits for a response)
+           ┄┄▶ asynchronous event (fire-and-forget, non-blocking)
+           Each SQS queue is independently owned by its one consuming service — a stuck
+           Notification consumer never backs up the Fulfillment or Analytics queues.</pre>
   </div>
 
-  <p style="font-size:13.5px; color:var(--slate);">This is deliberately drawn with solid lines only for the calls that are genuinely synchronous and blocking — Order → Inventory, Order → Payment, Payment → Sanctions Screening. Everything reaching Notification, Analytics, and most of Review/Search is event-driven and non-blocking, which is exactly what makes them safe to be down without affecting checkout at all — covered in detail in the next two sections.</p>
+  <p style="font-size:13.5px; color:var(--slate);">This is deliberately drawn with solid lines only for the calls that are genuinely synchronous and blocking — Order → Inventory, Order → Payment, Payment → Sanctions Screening. Everything past the SNS topic is event-driven and non-blocking, which is exactly what makes those services safe to be down without affecting checkout at all — covered in detail in the sections below.</p>
 </section>
 
-<section class="panel" id="communication" data-index="03">
+<section class="panel" id="infra" data-index="03">
+  <div class="corner tl"></div><div class="corner br"></div>
+  <h2>Infrastructure Components</h2>
+  <div class="tagline">The pieces that aren't "a service" but are just as critical to fault tolerance and performance — detailed individually</div>
+
+  <div class="block-title">Load Balancer</div>
+  <p style="font-size:14px;">An <b>Application Load Balancer</b> (Layer 7) sits in front of the API Gateway, spread across multiple Availability Zones. It health-checks every Gateway instance and stops routing to any that fail — meaning a single Gateway instance crashing is invisible to clients, traffic simply routes around it. This is the same ALB-vs-NLB decision from the AWS page: ALB specifically because the Gateway layer benefits from Layer 7 routing (host/path rules) even though at this layer it's mostly passing everything through to the Gateway itself.</p>
+
+  <div class="block-title">SNS → SQS Fan-Out, in detail</div>
+  <p style="font-size:14px;">Order Service publishes exactly <b>one</b> "OrderPlaced" event to a single SNS topic — it has no idea how many things downstream actually care, and doesn't need to. Three SQS queues are subscribed to that topic, one per consumer: <code>notification-queue</code>, <code>fulfillment-queue</code>, <code>analytics-queue</code>. This is the standard SNS-fan-out-to-SQS pattern from the Message Queues page: SNS gives the fan-out (every subscriber gets a copy), SQS gives each one its own durable, independently-paced buffer. A fourth consumer could be added tomorrow — a new SQS queue subscribed to the same topic — without Order Service being touched at all.</p>
+
+  <div class="block-title">Why each queue has its own DLQ</div>
+  <p style="font-size:14px;">Each SQS queue has a <b>redrive policy</b>: after 3 failed receive attempts (the consuming service threw an error or never deleted the message within its visibility timeout), the message moves to that queue's own Dead Letter Queue instead of retrying forever. Critically, the three DLQs are <b>independent</b> — if the Analytics consumer has a bug and everything it receives ends up in <code>analytics-dlq</code>, that has zero effect on Notification or Fulfillment, which keep processing normally from their own queues. Each DLQ has a CloudWatch alarm on queue depth, so a growing DLQ surfaces as an alert rather than silently accumulating failed messages forever.</p>
+
+  <div class="block-title">Redis Cache — shared, but not a hard dependency on anyone</div>
+  <p style="font-size:14px;">A single ElastiCache (Redis) cluster is shared by Product Catalog, Search, and Review/Rating — each uses the cache-aside pattern from the Fault Tolerance Matrix: check cache, fall back to the database on a miss or if Redis itself is unavailable. Sharing one cluster across three read-heavy services is a deliberate cost/ops trade-off (one cluster to run instead of three), accepted specifically because none of these three services treats the cache as a hard dependency — a Redis outage degrades all three simultaneously to direct-DB-read performance, but doesn't break any of them.</p>
+
+  <div class="say-box">
+    <span class="lbl">Say this in interview</span>
+    <p>"The infrastructure layer gets the same hard/soft treatment as the services do. The Load Balancer and SNS topic are structurally unable to be a single point of failure if configured correctly — multi-AZ health-checked targets, and SNS itself is a managed, highly-available service. The DLQs are what turn 'a message failed' from a silent, unbounded retry loop into a visible, bounded, alertable failure — and keeping them per-queue, not shared, is what stops one broken consumer from poisoning the others."</p>
+  </div>
+</section>
+
+<section class="panel" id="communication" data-index="04">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Communication Patterns</h2>
   <div class="tagline">Sync vs async isn't a style choice — it's decided by whether the caller needs to know the outcome before proceeding</div>
@@ -142,7 +188,7 @@
   </div>
 </section>
 
-<section class="panel" id="harddep" data-index="04">
+<section class="panel" id="harddep" data-index="05">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>The Core Principle: Hard vs Soft Dependencies</h2>
   <div class="tagline">This is the actual answer to "how do services keep working when a dependency is down" — the honest answer is: not all of them do, and that's correct</div>
@@ -163,7 +209,7 @@
   </div>
 </section>
 
-<section class="panel" id="matrix" data-index="05">
+<section class="panel" id="matrix" data-index="06">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Fault Tolerance & Fallback Matrix</h2>
   <div class="tagline">Every real dependency in the diagram, what happens if it's down, and which pattern from the Resilience Patterns page handles it</div>
@@ -187,6 +233,24 @@
       <td class="hard">HARD</td>
       <td><b>Never</b> falls back to skipping the check. Transaction held, bounded retry, and a clean failure if Screening stays unavailable past the timeout — fail-closed by design.</td>
       <td>Fail-closed + bounded retry, no fallback path</td>
+    </tr>
+    <tr>
+      <td>Client → API Gateway (via Load Balancer)</td>
+      <td class="hard" style="color:var(--amber);">HARD (mitigated)</td>
+      <td>A single Gateway instance failing health checks is simply removed from the ALB's target group — traffic routes to the remaining healthy instances with no client-visible impact. Only a full, multi-AZ Gateway outage is a genuine hard failure.</td>
+      <td>Multi-AZ Load Balancer + active health checks</td>
+    </tr>
+    <tr>
+      <td>Order Service → SNS Topic (publish)</td>
+      <td class="hard" style="color:var(--amber);">HARD (mitigated)</td>
+      <td>SNS is a managed, highly-available AWS service — Order Service isn't running or scaling it. A publish failure here is rare enough to just retry briefly rather than design an elaborate fallback for.</td>
+      <td>Managed service + brief retry</td>
+    </tr>
+    <tr>
+      <td>SQS Consumer → its own DLQ</td>
+      <td class="soft">SOFT (isolated)</td>
+      <td>If the Analytics consumer has a bug and every message lands in analytics-dlq, Notification and Fulfillment are entirely unaffected — each queue and DLQ pair is fully independent, so one broken consumer never poisons the others.</td>
+      <td>Per-consumer queue + DLQ isolation</td>
     </tr>
     <tr>
       <td>API Gateway → Identity (token validation)</td>
@@ -232,7 +296,7 @@
   </div>
 </section>
 
-<section class="panel" id="walkthrough" data-index="06">
+<section class="panel" id="walkthrough" data-index="07">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Checkout Flow — Failure Walkthroughs</h2>
   <div class="tagline">Same request, three different failure scenarios, traced step by step</div>
@@ -262,7 +326,7 @@
   </div>
 </section>
 
-<section class="panel" id="performance" data-index="07">
+<section class="panel" id="performance" data-index="08">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>High-Performance Techniques</h2>
   <div class="tagline">Where the real latency and throughput wins come from across this architecture</div>
@@ -282,7 +346,7 @@
   </div>
 </section>
 
-<section class="panel" id="drill" data-index="08">
+<section class="panel" id="drill" data-index="09">
   <div class="corner tl"></div><div class="corner br"></div>
   <h2>Rapid Recall Drill</h2>
   <div class="qa">
@@ -291,6 +355,9 @@
     <div class="qa-item"><div class="q">How does the API Gateway keep validating tokens even if Identity Service is briefly down?</div><div class="a">It caches Identity's public signing keys (JWKS) locally — most validations don't need a live call, turning a hard dependency into one that tolerates real outages.</div></div>
     <div class="qa-item"><div class="q">What happens to an Inventory reservation if Payment subsequently fails?</div><div class="a">The Saga's compensating step releases the reservation — this is exactly the Saga pattern from the Architecture page: local transactions plus explicit compensating actions on failure.</div></div>
     <div class="qa-item"><div class="q">Why is Review/Rating a soft dependency but Fulfillment is not, even though both are "downstream" of checkout?</div><div class="a">Reviews never need to happen at all for a valid purchase — pure UX. Shipping dispatch genuinely must happen eventually — it's a hard requirement, just with soft (asynchronous) timing, not a true soft dependency.</div></div>
+    <div class="qa-item"><div class="q">Why does Order Service publish to one SNS topic instead of calling Notification, Fulfillment, and Analytics directly?</div><div class="a">Fan-out via SNS means Order Service doesn't know or care how many downstream consumers exist — a 4th consumer can subscribe tomorrow without any change to Order Service at all.</div></div>
+    <div class="qa-item"><div class="q">If the Analytics consumer has a bug and fills its DLQ, does that affect Notification or Fulfillment?</div><div class="a">No — each SQS queue and its DLQ are fully independent per consumer. One broken consumer's failures are isolated to its own queue and never back up the others.</div></div>
+    <div class="qa-item"><div class="q">Why is sharing one Redis cluster across Catalog, Search, and Review an acceptable trade-off?</div><div class="a">None of the three treats the cache as a hard dependency — all three use cache-aside with a DB fallback, so a shared-cluster outage degrades all three to direct-DB-read speed but breaks none of them.</div></div>
   </div>
 </section>
 
